@@ -41,6 +41,8 @@ let Entities = [new Entity("assets/Chicken_Enemy.png")];
 function updateDirectionAndMovement() {
     let moving = false;
 
+    Entities.sort((a, b) => a.compare(b));
+
     if (keys["w"] || keys["ArrowUp"]) {
         sprite.setDirection(3); // backward
         moving = true;
@@ -69,16 +71,17 @@ function updateDirectionAndMovement() {
         const dy = centerY - entity.Y;
 
         const angle = Math.atan2(dy, dx);
-
-        if (angle > -Math.PI/4 && angle <= Math.PI/4) {
-            entity.setDirection(1); // right
-        } else if (angle > Math.PI/4 && angle <= 3*Math.PI/4) {
-            entity.setDirection(0); // forward
-        } else if (angle <= -Math.PI/4 && angle > -3*Math.PI/4) {
-            entity.setDirection(3); // backward
-        } else {
-            entity.setDirection(2); // left
-        }
+        if(gameFrame%FPS===0){
+            if (angle > -Math.PI/4 && angle <= Math.PI/4) {
+                entity.setDirection(1); // right
+            } else if (angle > Math.PI/4 && angle <= 3*Math.PI/4) {
+                entity.setDirection(0); // forward
+            } else if (angle <= -Math.PI/4 && angle > -3*Math.PI/4) {
+                entity.setDirection(3); // backward
+            } else {
+                entity.setDirection(2); // left
+            }
+            }
         entity.startMoving();
 
         entity.move(1)
@@ -103,7 +106,6 @@ function animate(timestamp) {
 
     if(gameFrame % SpawnTime === 0 && Entities.length < 30) {
         Entities.push(new Entity("assets/Chicken_Enemy.png"))
-        Entities.sort((a, b) => a.compare(b));
     }
 
     updateDirectionAndMovement();
@@ -114,8 +116,23 @@ function animate(timestamp) {
     const screenX = sprite.x;
     const screenY = sprite.y;
 
-    sprite.draw(ctx, gameFrame, screenX, screenY);
-    Entities.forEach(entity => {entity.draw(ctx, gameFrame);})
+    drawn = false;
+
+    // sprite.draw(ctx, gameFrame, screenX, screenY);
+    Entities.forEach(entity => {
+        if(!drawn) {
+            if (entity.Y > sprite.y) {
+                sprite.draw(ctx, gameFrame, screenX, screenY);
+                drawn = true;
+            } else if (entity.X < sprite.y && entity.Y === sprite.y) {
+                sprite.draw(ctx, gameFrame, screenX, screenY);
+                drawn = true;
+            }
+        }
+        entity.draw(ctx, gameFrame);})
+    if(!drawn){
+        sprite.draw(ctx, gameFrame, screenX, screenY);
+    }
     requestAnimationFrame(animate);
 }
 
