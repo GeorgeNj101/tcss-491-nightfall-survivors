@@ -27,6 +27,10 @@ sprite.y = canvas.height / 2 - sprite.frameHeight / 2;
 sprite.health = 100;
 sprite.maxHealth = 100;
 
+//Xp
+sprite.xp = 0;
+sprite.maxXP = 10;
+
 // Death state
 let isDead = false;
 let deathTime = 0;
@@ -60,6 +64,8 @@ let lastTime = 0;
 let gameFrame = 0;
 
 let Entities = [new Entity("assets/Chicken_Enemy.png")];
+let XP_Orbs = [new XpOrb(0,0) ]
+XP_Orbs.pop()
 
 let tileOffsetX = 0;
 let tileOffsetY = 0;
@@ -103,13 +109,53 @@ function updateDirectionAndMovement() {
     else sprite.stopMoving();
 
     let tempEntities = [...Entities];
+    let tempXpOrbs = [...XP_Orbs];
+
+    XP_Orbs.forEach((orb) => {
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+
+        const dx = centerX - orb.CenterX();
+        const dy = centerY - orb.CenterY();
+
+        let angle = Math.atan2(dy, dx);
+
+        if (gameFrame % FPS === 0) {
+            if (angle > -Math.PI / 4 && angle <= Math.PI / 4) {
+                orb.moveInDirection(1, 1);
+            } else if (angle > Math.PI / 4 && angle <= 3 * Math.PI / 4) {
+                orb.moveInDirection(2, 0);
+            } else if (angle <= -Math.PI / 4 && angle > -3 * Math.PI / 4) {
+                orb.moveInDirection(2, 3);
+            } else {
+                orb.moveInDirection(2, 2);
+            }
+        }
+
+        // Collision with player
+        if (
+            orb.CenterX() >= centerX- 16 / 2 &&
+            orb.CenterX() <= centerX + 16 / 2 &&
+            orb.CenterY() >= centerY - 16 / 2 &&
+            orb.CenterY() <= centerY + 16 / 2
+        ) {
+            tempXpOrbs = tempXpOrbs.filter(temp => temp !== orb);
+            sprite.xp++
+        }
+
+        if (moving) {
+            orb.moveInDirection(1, (3 - sprite.direction) % 4);
+        }
+    })
+
+    XP_Orbs = tempXpOrbs;
 
     Entities.forEach(entity => {
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
 
-        const dx = centerX - entity.X;
-        const dy = centerY - entity.Y;
+        const dx = centerX - entity.CenterX();
+        const dy = centerY - entity.CenterY();
 
         let angle = Math.atan2(dy, dx);
         if (gameFrame % FPS === 0) {
@@ -151,6 +197,7 @@ function updateDirectionAndMovement() {
             const attackAngleDeg = 100;
 
             if (Math.abs(diffDeg) <= attackAngleDeg / 2) {
+                XP_Orbs.push(new XpOrb(entity.CenterX(),entity.CenterY()))
                 tempEntities = tempEntities.filter(temp => temp !== entity);
             } else if (gameFrame % FPS === 0) {
                 sprite.health -= 5;
@@ -162,6 +209,7 @@ function updateDirectionAndMovement() {
     });
 
     Entities = tempEntities;
+
 }
 
 // ----------------------
@@ -260,6 +308,35 @@ function animate(timestamp) {
     drawTiles();
 
     // ----------------------
+    // DRAW PLAYER + ENTITIES
+    // ----------------------
+    const screenX = sprite.x;
+    const screenY = sprite.y;
+
+    let drawn = false;
+
+    Entities.forEach(entity => {
+        if (!drawn) {
+            if (entity.Y > sprite.y) {
+                sprite.draw(ctx, gameFrame, screenX, screenY);
+                drawn = true;
+            } else if (entity.X < sprite.y && entity.Y === sprite.y) {
+                sprite.draw(ctx, gameFrame, screenX, screenY);
+                drawn = true;
+            }
+        }
+        entity.draw(ctx, gameFrame);
+    });
+
+    if (!drawn) {
+        sprite.draw(ctx, gameFrame, screenX, screenY);
+    }
+
+    XP_Orbs.forEach(Orb => {
+        Orb.draw(ctx, gameFrame);
+    })
+
+    // ----------------------
     // PLAYER HEALTH BAR
     // ----------------------
     const barWidth = 200;
@@ -285,6 +362,30 @@ function animate(timestamp) {
         `${Math.floor(sprite.health)} / ${sprite.maxHealth}`,
         barX + barWidth / 2,
         barY + barHeight - 4
+    );
+
+    // ----------------------
+    // PLAYER XP BAR
+    // ----------------------
+
+    ctx.fillStyle = "#000055";
+    ctx.fillRect(barX, barY+30, barWidth, barHeight);
+
+    const xpPercent = sprite.xp / sprite.maxXP;
+    ctx.fillStyle = "blue";
+    ctx.fillRect(barX, barY+30, barWidth * xpPercent, barHeight);
+
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(barX, barY+30, barWidth, barHeight);
+
+    ctx.fillStyle = "white";
+    ctx.font = "20px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(
+        `${Math.floor(sprite.xp)} / ${sprite.maxXP}`,
+        barX + barWidth / 2,
+        barY+30 + barHeight - 4
     );
 
     // ----------------------
@@ -318,30 +419,7 @@ function animate(timestamp) {
         ctx.fillText(`Enemies: ${Entities.length}`, canvas.width - 20, barY + 80);
     }
 
-    // ----------------------
-    // DRAW PLAYER + ENTITIES
-    // ----------------------
-    const screenX = sprite.x;
-    const screenY = sprite.y;
 
-    drawn = false;
-
-    Entities.forEach(entity => {
-        if (!drawn) {
-            if (entity.Y > sprite.y) {
-                sprite.draw(ctx, gameFrame, screenX, screenY);
-                drawn = true;
-            } else if (entity.X < sprite.y && entity.Y === sprite.y) {
-                sprite.draw(ctx, gameFrame, screenX, screenY);
-                drawn = true;
-            }
-        }
-        entity.draw(ctx, gameFrame);
-    });
-
-    if (!drawn) {
-        sprite.draw(ctx, gameFrame, screenX, screenY);
-    }
 
     // ----------------------
     // DEATH SCREEN
