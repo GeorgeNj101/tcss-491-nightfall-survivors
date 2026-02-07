@@ -307,34 +307,13 @@ function animate(timestamp) {
 
     drawTiles();
 
-    // ----------------------
-    // DRAW PLAYER + ENTITIES
-    // ----------------------
-    const screenX = sprite.x;
-    const screenY = sprite.y;
+    drawEntities();
 
-    let drawn = false;
 
-    Entities.forEach(entity => {
-        if (!drawn) {
-            if (entity.Y > sprite.y) {
-                sprite.draw(ctx, gameFrame, screenX, screenY);
-                drawn = true;
-            } else if (entity.X < sprite.y && entity.Y === sprite.y) {
-                sprite.draw(ctx, gameFrame, screenX, screenY);
-                drawn = true;
-            }
-        }
-        entity.draw(ctx, gameFrame);
-    });
+    //todo Move UI elements into function below
+    drawUI();
 
-    if (!drawn) {
-        sprite.draw(ctx, gameFrame, screenX, screenY);
-    }
 
-    XP_Orbs.forEach(Orb => {
-        Orb.draw(ctx, gameFrame);
-    })
 
     // ----------------------
     // PLAYER HEALTH BAR
@@ -446,6 +425,44 @@ function drawTiles() {
             );
         }
     }
+}
+
+function drawEntities(){
+
+    XP_Orbs.forEach(Orb => {
+        Orb.draw(ctx, gameFrame);
+    })
+
+    // ----------------------
+    // DRAW PLAYER + ENTITIES
+    // ----------------------
+    const screenX = sprite.x;
+    const screenY = sprite.y;
+
+    let drawn = false;
+
+    Entities.forEach(entity => {
+        if (!drawn) {
+            if (entity.Y > sprite.y) {
+                sprite.draw(ctx, gameFrame, screenX, screenY);
+                drawn = true;
+            } else if (entity.X < sprite.y && entity.Y === sprite.y) {
+                sprite.draw(ctx, gameFrame, screenX, screenY);
+                drawn = true;
+            }
+        }
+        entity.draw(ctx, gameFrame);
+    });
+
+    if (!drawn) {
+        sprite.draw(ctx, gameFrame, screenX, screenY);
+    }
+
+
+}
+
+function drawUI(){
+
 }
 
 requestAnimationFrame(animate);
