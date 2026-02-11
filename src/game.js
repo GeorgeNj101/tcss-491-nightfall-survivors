@@ -11,7 +11,6 @@ export default class Game {
         this.width = canvas.width;
         this.height = canvas.height;
 
-        // --- Game State ---
         this.keys = {};
         this.enemies = [];
         this.xpOrbs = [];
@@ -21,7 +20,7 @@ export default class Game {
         this.elapsedTime = 0;
         this.lastSecondTime = 0;
         this.lastTime = 0;
-        this.score = 0; // Fixed: Added score back to constructor
+        this.score = 0;
 
         // --- Player Stats ---
         this.player = new Sprite("assets/Main_Character.png");

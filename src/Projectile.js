@@ -4,14 +4,14 @@ export default class Projectile extends Sprite {
     constructor(x, y, dx, dy) {
         super("assets/Bolt.png", { x, y, cols: 1, rows: 1, radius: 30});
         
-        this.vx = dx; // Velocity X
-        this.vy = dy; // Velocity Y
+        this.vx = dx; 
+        this.vy = dy; 
         this.speed = 8;
         this.size = 32;
         
 
         this.timer = 0;
-        this.maxTime = 200; // Disappear after ~3 seconds (60fps)
+        this.maxTime = 200; 
     }
 
     update() {

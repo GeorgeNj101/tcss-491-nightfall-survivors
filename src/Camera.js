@@ -15,6 +15,6 @@ export default class Camera {
         this.x = targetCenterX - this.width / 2;
         this.y = targetCenterY - this.height / 2;
         
-        // Optional: If you want map boundaries, you would clamp this.x and this.y here.
+
     }
 }
