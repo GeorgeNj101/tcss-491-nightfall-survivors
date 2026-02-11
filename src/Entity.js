@@ -1,60 +1,65 @@
-const OffsetScale = 2;
-class Entity extends Sprite {
-    X;
-    Y;
-    constructor(pngPath) {
-        super(pngPath);
-        this.spawn();
-    }
-    spawn(){
-        let offset = 128 * OffsetScale;
+import Sprite from "./Sprite.js";
 
-        let rangeX = scaleX - (2 * offset);
-        let x = Math.random() * rangeX;
-        if (x > (rangeX / 2)) {
-            this.X = x + offset * -(this.frameWidth/2)
-        }else{
-            this.X = x-(this.frameWidth/2)
+export default class Entity extends Sprite {
+    constructor(camera) {
+        super("assets/Chicken_Enemy.png");
+        this.spawn(camera);
+        this.speed = 2; // Slower than player
+    }
+
+    spawn(camera) {
+    const offset = 200; 
+    // Spawn relative to CAMERA position, not 0,0
+    const spawnX = camera.x + (Math.random() * (camera.width + offset * 2)) - offset;
+    const spawnY = camera.y + (Math.random() * (camera.height + offset * 2)) - offset;
+
+    // Check if inside the CURRENT view (camera view)
+    if (
+        spawnX > camera.x && spawnX < camera.x + camera.width &&
+        spawnY > camera.y && spawnY < camera.y + camera.height
+    ) {
+        // If spawned inside screen, push it out
+        this.y = (Math.random() > 0.5) ? camera.y - offset : camera.y + camera.height + offset;
+        this.x = spawnX;
+    } else {
+        this.x = spawnX;
+        this.y = spawnY;
+    }
+}
+
+    update(playerX, playerY) {
+        // 1. Calculate Center Points
+        const myCx = this.x + this.frameWidth / 2;
+        const myCy = this.y + this.frameHeight / 2;
+        const plCx = playerX + 32; // Assuming player center roughly
+        const plCy = playerY + 32;
+
+        const dx = plCx - myCx;
+        const dy = plCy - myCy;
+        const angle = Math.atan2(dy, dx);
+
+        // 2. Set Direction based on angle
+        // -PI/4 to PI/4 is Right (approx)
+        const degrees = angle * (180 / Math.PI);
+        
+        if (degrees > -45 && degrees <= 45) this.direction = 1;      // Right
+        else if (degrees > 45 && degrees <= 135) this.direction = 0; // Down (Forward)
+        else if (degrees > -135 && degrees <= -45) this.direction = 3; // Up (Backward)
+        else this.direction = 2;                                     // Left
+
+        // 3. Move towards player
+        const dist = Math.hypot(dx, dy);
+        if (dist > 1) {
+            this.x += (dx / dist) * this.speed;
+            this.y += (dy / dist) * this.speed;
+            this.moving = true;
+        } else {
+            this.moving = false;
         }
-
-        let rangeY = scaleY - (2 * offset);
-        let y = Math.random() * rangeY;
-        if (y > (rangeY / 2)) {
-            this.Y = y + offset * 2 -(this.frameHeight/2)
-        }else{
-            this.Y = y-(this.frameHeight/2)
-        }
     }
 
-    draw(ctx, gameFrame) {
-        super.draw(ctx, gameFrame, this.X, this.Y);
-    }
-
-    CenterX(){
-        return this.X+(this.frameWidth/2)
-    }
-    CenterY(){
-        return this.Y+(this.frameHeight/2)
-    }
-
-    move(speed) {
-        this.moveInDirection(speed, this.direction);
-    }
-
-    moveInDirection(speed, theDirection) {
-        switch (theDirection) {
-            case 0: this.Y += speed; break; // forward
-            case 1: this.X += speed; break; // right
-            case 2: this.X -= speed; break; // left
-            case 3: this.Y -= speed; break; // backward
-        }
-    }
-
-    compare(other) {
-        if (this.Y < other.Y) return -1;
-        if (this.Y > other.Y) return 1;
-        if (this.X < other.X) return -1;
-        if (this.X > other.X) return 1;
-        return 0;
+    // For Z-Index sorting
+    getBottomY() {
+        return this.y + this.frameHeight;
     }
 }

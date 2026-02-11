@@ -1,468 +1,378 @@
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+import Sprite from "./Sprite.js";
+import Entity from "./Entity.js";
+import XpOrb from "./XpOrb.js";
+import Projectile from "./Projectile.js";
+import Camera from "./Camera.js";
 
-const scaleX = 1600;
-const scaleY = 900;
+export default class Game {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext("2d");
+        this.width = canvas.width;
+        this.height = canvas.height;
 
-canvas.width = 1600;
-canvas.height = 900;
+        // --- Game State ---
+        this.keys = {};
+        this.enemies = [];
+        this.xpOrbs = [];
+        this.projectiles = [];
+        this.gameFrame = 0;
+        this.isDead = false;
+        this.elapsedTime = 0;
+        this.lastSecondTime = 0;
+        this.score = 0; // Fixed: Added score back to constructor
 
-// ----------------------
-// KEY INPUT
-// ----------------------
-const keys = {};
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
+        // --- Player Stats ---
+        this.player = new Sprite("assets/Main_Character.png");
+        this.player.x = this.width / 2 - 64; 
+        this.player.y = this.height / 2 - 64;
+        this.camera = new Camera(this.width, this.height);
 
-// ----------------------
-// SPRITE INSTANCE
-// ----------------------
-const sprite = new Sprite("assets/Main_Character.png");
+        this.stats = {
+            hp: 100,
+            maxHp: 100,
+            xp: 0,
+            maxXp: 10,
+            level: 1,
+            speed: 4,
+            attackCooldown: 60,
+            attackTimer: 0
+        };
 
-// center sprite on screen
-sprite.x = canvas.width / 2 - sprite.frameWidth / 2;
-sprite.y = canvas.height / 2 - sprite.frameHeight / 2;
+        // --- Wave Logic ---
+        this.wave = 1;
+        this.waveEnemies = 5;
+        this.waveTimer = 60; // seconds
+        this.waveStartTime = 0;
+        this.waveEnemiesSpawned = false;
 
-// Add health
-sprite.health = 100;
-sprite.maxHealth = 100;
+        // --- World ---
+        this.tileOffsetX = 0;
+        this.tileOffsetY = 0;
+        this.tileSize = 64;
+        this.grassImage = new Image();
+        this.grassImage.src = "assets/Grass.png";
 
-//Xp
-sprite.xp = 0;
-sprite.maxXP = 10;
-
-// Death state
-let isDead = false;
-let deathTime = 0;
-
-// ----------------------
-// ELAPSED TIME COUNTER
-// ----------------------
-let elapsedTime = 0; // seconds elapsed since game start
-let lastSecondTime = 0;  // real-time tracking
-
-// ----------------------
-// WAVE SYSTEM
-// ----------------------
-let currentWave = 1;
-let waveEnemies = 5; // starting enemies per wave
-let waveTimer = 60; // 60 seconds per wave
-let waveStartTime = 0;
-let waveActive = true;
-let waveCompleted = false;
-let gameStarted = false;
-let waveEnemiesSpawned = false;
-
-// ----------------------
-// ANIMATION TIMING
-// ----------------------
-const FPS = 4;
-const FRAME_TIME = 1000 / FPS;
-const SpawnTime = 10 * FPS;
-
-let lastTime = 0;
-let gameFrame = 0;
-
-let Entities = [new Entity("assets/Chicken_Enemy.png")];
-let XP_Orbs = [new XpOrb(0,0) ]
-XP_Orbs.pop()
-
-let tileOffsetX = 0;
-let tileOffsetY = 0;
-const tileSize = 64;
-
-// ----------------------
-// UPDATE MOVEMENT + DIRECTION
-// ----------------------
-function updateDirectionAndMovement() {
-    if (isDead) return;
-
-    let moving = false;
-
-    Entities.sort((a, b) => a.compare(b));
-
-    if (keys["w"] || keys["ArrowUp"]) {
-        sprite.setDirection(3);
-        moving = true;
-        tileOffsetY += 2;
-    }
-    if (keys["s"] || keys["ArrowDown"]) {
-        sprite.setDirection(0);
-        moving = true;
-        tileOffsetY -= 2;
-    }
-    if (keys["a"] || keys["ArrowLeft"]) {
-        sprite.setDirection(2);
-        moving = true;
-        tileOffsetX += 2;
-    }
-    if (keys["d"] || keys["ArrowRight"]) {
-        sprite.setDirection(1);
-        moving = true;
-        tileOffsetX -= 2;
+        this.init();
     }
 
-    tileOffsetX %= tileSize;
-    tileOffsetY %= tileSize;
+    init() {
+        window.addEventListener("keydown", e => {
+            this.keys[e.key] = true;
+            if (this.isDead && e.key.toLowerCase() === 'r') location.reload();
+        });
+        window.addEventListener("keyup", e => this.keys[e.key] = false);
+        
+        this.animate = this.animate.bind(this);
+        requestAnimationFrame(this.animate);
+    }
 
-    if (moving) sprite.startMoving();
-    else sprite.stopMoving();
+    update(timestamp) {
+        if (this.isDead) return;
 
-    let tempEntities = [...Entities];
-    let tempXpOrbs = [...XP_Orbs];
+        this.gameFrame++;
+        this.updateTimers(timestamp);
+        this.handleWaveSystem(timestamp);
+        this.handleMovement();
+        this.handleCombat();
+        this.handleXpCollection();
+        
+        if (this.stats.hp <= 0) {
+            this.isDead = true;
+            this.stats.hp = 0;
+        }
+    }
 
-    XP_Orbs.forEach((orb) => {
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
+    updateTimers(timestamp) {
+        if (timestamp - this.lastSecondTime >= 1000) {
+            this.elapsedTime++;
+            this.lastSecondTime = timestamp;
+        }
+        this.stats.attackTimer++;
+    }
 
-        const dx = centerX - orb.CenterX();
-        const dy = centerY - orb.CenterY();
+    handleWaveSystem(timestamp) {
+        // Pass the camera to the new Entity
+        if (this.waveStartTime === 0) this.waveStartTime = timestamp;
+        
+        // Spawn Wave
+        if (!this.waveEnemiesSpawned) {
+            for (let i = 0; i < this.waveEnemies; i++) {
+                this.enemies.push(new Entity(this.camera));
+            }
+            this.waveEnemiesSpawned = true;
+        }
 
-        let angle = Math.atan2(dy, dx);
+        // Check Wave Completion
+        const waveElapsed = (timestamp - this.waveStartTime) / 1000;
+        if (waveElapsed >= this.waveTimer || (this.enemies.length === 0 && this.waveEnemiesSpawned)) {
+            this.wave++;
+            this.waveEnemies += 2;
+            this.waveTimer = Math.max(30, this.waveTimer - 5);
+            this.waveStartTime = timestamp;
+            this.waveEnemiesSpawned = false;
+        }
+    }
 
-        if (gameFrame % FPS === 0) {
-            if (angle > -Math.PI / 4 && angle <= Math.PI / 4) {
-                orb.moveInDirection(1, 1);
-            } else if (angle > Math.PI / 4 && angle <= 3 * Math.PI / 4) {
-                orb.moveInDirection(2, 0);
-            } else if (angle <= -Math.PI / 4 && angle > -3 * Math.PI / 4) {
-                orb.moveInDirection(2, 3);
-            } else {
-                orb.moveInDirection(2, 2);
+    handleMovement() {
+        let dx = 0, dy = 0;
+        if (this.keys["w"] || this.keys["ArrowUp"]) { dy = -1; this.player.direction = 3; }
+        if (this.keys["s"] || this.keys["ArrowDown"]) { dy = 1; this.player.direction = 0; }
+        if (this.keys["a"] || this.keys["ArrowLeft"]) { dx = -1; this.player.direction = 2; }
+        if (this.keys["d"] || this.keys["ArrowRight"]) { dx = 1; this.player.direction = 1; }
+
+        // if (dx !== 0 || dy !== 0) {
+        //     this.player.moving = true;
+        //     const moveSpeed = this.stats.speed;
+        //     this.tileOffsetX = (this.tileOffsetX + dx * moveSpeed) % this.tileSize;
+        //     this.tileOffsetY = (this.tileOffsetY + dy * moveSpeed) % this.tileSize;
+            
+        //     // Move world objects relative to player
+        //     const objects = [...this.enemies, ...this.xpOrbs, ...this.projectiles];
+        //     objects.forEach(obj => {
+        //         obj.x += dx * moveSpeed;
+        //         obj.y += dy * moveSpeed;
+        //     });
+        // } else {
+        //     this.player.moving = false;
+        // }
+        if (dx !== 0 || dy !== 0) {
+            this.player.moving = true;
+
+            // Normalize vector (prevent faster diagonal movement)
+            const length = Math.hypot(dx, dy);
+            dx /= length;
+            dy /= length;
+            
+
+            // Move Player in WORLD coordinates
+            this.player.x += dx * this.stats.speed;
+            this.player.y += dy * this.stats.speed;
+
+            this.camera.update(this.player);
+        } else {
+            this.player.moving = false;
+        }
+
+        // Update Camera to follow player
+        // this.camera.update(this.player);
+    }
+
+    handleCombat() {
+        // 1. Auto-Fire Projectiles
+        if (this.stats.attackTimer >= this.stats.attackCooldown) {
+            const target = this.getNearestEnemy();
+            if (target) {
+                this.projectiles.push(new Projectile(this.player.x, this.player.y, target));
+                this.stats.attackTimer = 0;
             }
         }
 
-        // Collision with player
-        if (
-            orb.CenterX() >= centerX- 16 / 2 &&
-            orb.CenterX() <= centerX + 16 / 2 &&
-            orb.CenterY() >= centerY - 16 / 2 &&
-            orb.CenterY() <= centerY + 16 / 2
-        ) {
-            tempXpOrbs = tempXpOrbs.filter(temp => temp !== orb);
-            sprite.xp++
-        }
+        // 2. Projectile Logic (Movement + Collision)
+        this.projectiles.forEach(p => {
+            p.update();
+            
+            // Check collision with its target
+            if (p.target && !p.target.markedForDeletion) {
+                const dist = p.getDistance(p.target);
+                if (dist < 30) { // Hit!
+                    console.log("DEBUG: Projectile Hit! Enemy Defeated."); // --- DEBUG LOG ---
+                    p.markedForDeletion = true;
+                    p.target.markedForDeletion = true;
+                    
+                    // DROP XP ORB HERE
+                    console.log(`DEBUG: Spawning XP Orb at ${p.target.x}, ${p.target.y}`); // --- DEBUG LOG ---
+                    this.xpOrbs.push(new XpOrb(p.target.x, p.target.y));
+                    
+                    this.score += 10;
+                }
+            }
+        });
+        this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
 
-        if (moving) {
-            orb.moveInDirection(1, (3 - sprite.direction) % 4);
-        }
-    })
+        // 3. Enemy Logic (Movement + Player Collision)
+        this.enemies.forEach(enemy => {
+            enemy.update(this.player.x, this.player.y);
+            const dist = enemy.getDistance(this.player);
 
-    XP_Orbs = tempXpOrbs;
+            if (dist < 40) {
+                // if (this.isFacing(enemy)) {
+                //     // Player melee attack
+                //     console.log("DEBUG: Melee Stab! Enemy Defeated."); // --- DEBUG LOG ---
+                //     enemy.markedForDeletion = true;
+                    
+                //     console.log(`DEBUG: Spawning XP Orb at ${enemy.x}, ${enemy.y}`); // --- DEBUG LOG ---
+                //     this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
+                // } else if (this.gameFrame % 20 === 0) {
+                //     // Player takes damage
+                //     this.stats.hp -= 5;
+                // }
+                this.stats.hp -= 30;
+                enemy.markedForDeletion = true;
+                console.log("DEBUG: Enemy Collision! Player takes damage."); // --- DEBUG LOG ---
+            }
+        });
+        this.enemies = this.enemies.filter(e => !e.markedForDeletion);
+    }
 
-    Entities.forEach(entity => {
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
+    handleXpCollection() {
+        this.xpOrbs.forEach(orb => {
+            const dist = orb.getDistance(this.player);
+            if (dist < 150) { // Magnet range
+                const moveX = (this.player.x - orb.x) * 0.1;
+                const moveY = (this.player.y - orb.y) * 0.1;
+                orb.x += moveX;
+                orb.y += moveY;
+            }
+            if (dist < 30) {
+                orb.markedForDeletion = true;
+                this.stats.xp++;
+                if (this.stats.xp >= this.stats.maxXp) this.levelUp();
+            }
+        });
+        this.xpOrbs = this.xpOrbs.filter(o => !o.markedForDeletion);
+    }
 
-        const dx = centerX - entity.CenterX();
-        const dy = centerY - entity.CenterY();
+    levelUp() {
+        this.stats.level++;
+        this.stats.xp = 0;
+        this.stats.maxXp = Math.floor(this.stats.maxXp * 1.5);
+        this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + 20);
+        console.log("DEBUG: Level Up! Level " + this.stats.level);
+    }
 
-        let angle = Math.atan2(dy, dx);
-        if (gameFrame % FPS === 0) {
-            if (angle > -Math.PI / 4 && angle <= Math.PI / 4) {
-                entity.setDirection(1);
-            } else if (angle > Math.PI / 4 && angle <= 3 * Math.PI / 4) {
-                entity.setDirection(0);
-            } else if (angle <= -Math.PI / 4 && angle > -3 * Math.PI / 4) {
-                entity.setDirection(3);
-            } else {
-                entity.setDirection(2);
+    getNearestEnemy() {
+        return this.enemies.reduce((nearest, current) => {
+            const dist = current.getDistance(this.player);
+            if (!nearest || dist < nearest.dist) return { item: current, dist };
+            return nearest;
+        }, null)?.item;
+    }
+
+    isFacing(enemy) {
+        const dx = enemy.x - this.player.x;
+        const dy = enemy.y - this.player.y;
+        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+        const facing = [90, 0, 180, -90][this.player.direction];
+        let diff = Math.abs(angle - facing);
+        if (diff > 180) diff = 360 - diff;
+        return diff <= 50; 
+    }
+
+    draw(timestamp) {
+        this.ctx.clearRect(0, 0, this.width, this.height);
+        this.drawBackground();
+
+        const renderList = [this.player, ...this.enemies, ...this.xpOrbs, ...this.projectiles];
+        renderList.sort((a, b) => (a.y + a.frameHeight) - (b.y + b.frameHeight));
+
+        renderList.forEach(obj => {
+            // Convert World Position -> Screen Position
+            const screenX = obj.x - this.camera.x;
+            const screenY = obj.y - this.camera.y;
+
+            // Optimization: Only draw if visible on screen (Culling)
+            // Add a buffer (e.g., 100px) so sprites don't pop out at edges
+            if (
+                screenX + obj.frameWidth > -100 &&
+                screenX < this.width + 100 &&
+                screenY + obj.frameHeight > -100 &&
+                screenY < this.height + 100
+            ) {
+                obj.draw(this.ctx, Math.floor(this.gameFrame / 4), screenX, screenY);
+            }
+        });
+
+        this.drawUI(timestamp);
+        if (this.isDead) this.drawDeathScreen();
+        
+    }
+
+    drawBackground() {
+        // for (let x = -this.tileSize; x < this.width + this.tileSize; x += this.tileSize) {
+        //     for (let y = -this.tileSize; y < this.height + this.tileSize; y += this.tileSize) {
+        //         this.ctx.drawImage(this.grassImage, x + this.tileOffsetX, y + this.tileOffsetY, this.tileSize, this.tileSize);
+        //     }
+        // }
+        // If camera moves right (positive x), background must shift left
+        const offsetX = -this.camera.x % this.tileSize;
+        const offsetY = -this.camera.y % this.tileSize;
+
+        // Draw enough tiles to cover the screen
+        // We start at -tileSize to prevent gaps when scrolling
+        for (let x = -this.tileSize; x < this.width + this.tileSize; x += this.tileSize) {
+            for (let y = -this.tileSize; y < this.height + this.tileSize; y += this.tileSize) {
+                this.ctx.drawImage(
+                    this.grassImage, 
+                    x + offsetX, 
+                    y + offsetY, 
+                    this.tileSize, 
+                    this.tileSize
+                );
             }
         }
-
-        entity.startMoving();
-
-        if (moving) {
-            entity.moveInDirection(2, (3 - sprite.direction) % 4);
-        }
-
-        // Collision with player
-        if (
-            entity.X >= sprite.x - sprite.frameWidth / 2 &&
-            entity.X <= sprite.x + sprite.frameWidth / 2 &&
-            entity.Y >= sprite.y - sprite.frameHeight / 2 &&
-            entity.Y <= sprite.y + sprite.frameHeight / 2
-        ) {
-            const dx = entity.X - sprite.x;
-            const dy = entity.Y - sprite.y;
-
-            let enemyAngleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
-
-            const facingAnglesDeg = [90, 0, 180, -90];
-            let playerFacingDeg = facingAnglesDeg[sprite.direction];
-
-            let diffDeg = enemyAngleDeg - playerFacingDeg;
-            diffDeg = ((diffDeg + 180) % 360) - 180;
-
-            const attackAngleDeg = 100;
-
-            if (Math.abs(diffDeg) <= attackAngleDeg / 2) {
-                XP_Orbs.push(new XpOrb(entity.CenterX(),entity.CenterY()))
-                tempEntities = tempEntities.filter(temp => temp !== entity);
-            } else if (gameFrame % FPS === 0) {
-                sprite.health -= 5;
-                if (sprite.health < 0) sprite.health = 0;
-            }
-        }
-
-        entity.move(1);
-    });
-
-    Entities = tempEntities;
-
-}
-
-// ----------------------
-// DRAW DEATH SCREEN
-// ----------------------
-function drawDeathScreen() {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = "white";
-    ctx.font = "80px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("YOU DIED", canvas.width / 2, canvas.height / 2 - 50);
-
-    ctx.font = "40px Arial";
-    ctx.fillText(`Survived: ${Math.floor(deathTime / FPS)} seconds`, canvas.width / 2, canvas.height / 2 + 20);
-
-    ctx.font = "30px Arial";
-    ctx.fillText("Press R to Restart", canvas.width / 2, canvas.height / 2 + 80);
-}
-
-// Restart on R
-document.addEventListener("keydown", e => {
-    if (isDead && e.key.toLowerCase() === "r") {
-        location.reload();
-    }
-});
-
-// ----------------------
-// MAIN LOOP
-// ----------------------
-function animate(timestamp) {
-    if (!gameStarted) {
-        waveStartTime = timestamp;
-        gameStarted = true;
     }
 
-    const delta = timestamp - lastTime;
+    drawUI(timestamp) {
+        const ctx = this.ctx;
+        // Bars
+        this.drawBar(20, 20, 200, 20, this.stats.hp / this.stats.maxHp, "red", `${Math.floor(this.stats.hp)}/${this.stats.maxHp}`);
+        this.drawBar(20, 50, 200, 20, this.stats.xp / this.stats.maxXp, "blue", `${this.stats.xp}/${this.stats.maxXp}`);
+        
+        // Wave Info
+        const waveElapsed = (timestamp - this.waveStartTime) / 1000;
+        const waveRemaining = Math.max(0, this.waveTimer - waveElapsed);
+        const waveMin = Math.floor(waveRemaining / 60);
+        const waveSec = Math.floor(waveRemaining % 60);
+        const waveFormatted = `${waveMin}:${waveSec.toString().padStart(2, '0')}`;
 
-    if (!isDead && delta >= FRAME_TIME) {
-        lastTime = timestamp;
-        gameFrame++;
+        ctx.fillStyle = "white";
+        ctx.font = "24px Arial";
+        
+        ctx.textAlign = "left";
+        ctx.fillText(`Time: ${Math.floor(this.elapsedTime / 60)}:${(this.elapsedTime % 60).toString().padStart(2, '0')}`, 240, 40);
+        
+        ctx.textAlign = "right";
+        ctx.fillText(`Wave: ${this.wave}`, this.width - 20, 40);
+        ctx.fillText(`Wave Timer: ${waveFormatted}`, this.width - 20, 70);
+        ctx.fillText(`Enemies: ${this.enemies.length}`, this.width - 20, 100);
     }
 
-    // ----------------------
-    // REAL-TIME ELAPSED TIMER
-    // ----------------------
-    if (!isDead) {
-        if (timestamp - lastSecondTime >= 1000) {
-            elapsedTime++;
-            lastSecondTime = timestamp;
-        }
+    drawBar(x, y, w, h, percent, color, label) {
+        this.ctx.fillStyle = "#333";
+        this.ctx.fillRect(x, y, w, h);
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(x, y, w * percent, h);
+        this.ctx.strokeStyle = "white";
+        this.ctx.strokeRect(x, y, w, h);
+        this.ctx.fillStyle = "white";
+        this.ctx.font = "14px Arial";
+        this.ctx.textAlign = "center";
+        this.ctx.fillText(label, x + w / 2, y + h - 5);
     }
 
-    // Check for death
-    if (!isDead && sprite.health <= 0) {
-        isDead = true;
-        deathTime = gameFrame;
+    drawDeathScreen() {
+        this.ctx.fillStyle = "rgba(0,0,0,0.8)";
+        this.ctx.fillRect(0, 0, this.width, this.height);
+        this.ctx.fillStyle = "white";
+        this.ctx.textAlign = "center";
+        this.ctx.font = "80px Arial";
+        this.ctx.fillText("YOU DIED", this.width / 2, this.height / 2 - 40);
+        this.ctx.font = "30px Arial";
+        this.ctx.fillText(`Survived ${this.elapsedTime}s - Press R to Restart`, this.width / 2, this.height / 2 + 40);
     }
 
-    // Wave system logic
-    if (!isDead && waveActive) {
-        // Start new wave immediately when completed
-        if (waveCompleted) {
-            currentWave++;
-            waveEnemies += 2; // Increase enemies per wave
-            waveTimer = Math.max(30, waveTimer - 5); // Decrease timer, minimum 30 seconds
-            waveCompleted = false;
-            waveStartTime = timestamp; // Reset wave timer
-            waveEnemiesSpawned = false; // Reset spawn flag for new wave
-        }
+    animate(timestamp) {
+        // this.update(timestamp);
+        // this.draw(timestamp);
+        // requestAnimationFrame(this.animate);
+        // Calculate time difference
+    const deltaTime = timestamp - this.lastTime;
+    this.lastTime = timestamp;
 
-        // Spawn enemies at the start of each wave (only once per wave)
-        if (!waveEnemiesSpawned && !waveCompleted) {
-            for (let i = 0; i < waveEnemies; i++) {
-                Entities.push(new Entity("assets/Chicken_Enemy.png"));
-            }
-            waveEnemiesSpawned = true;
-        }
-
-        // Check wave timer
-        const waveElapsed = (timestamp - waveStartTime) / 1000;
-        if (waveElapsed >= waveTimer) {
-            // Timer ran out - start next wave (enemies persist)
-            waveCompleted = true;
-        } else if (Entities.length === 0 && waveElapsed < waveTimer) {
-            // All enemies defeated before timer - start next wave immediately
-            waveCompleted = true;
-        }
-    }
-
-    updateDirectionAndMovement();
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    drawTiles();
-
-    drawEntities();
-
-
-    //todo Move UI elements into function below
-    drawUI();
-
-
-
-    // ----------------------
-    // PLAYER HEALTH BAR
-    // ----------------------
-    const barWidth = 200;
-    const barHeight = 20;
-    const barX = 20;
-    const barY = 20;
-
-    ctx.fillStyle = "#550000";
-    ctx.fillRect(barX, barY, barWidth, barHeight);
-
-    const healthPercent = sprite.health / sprite.maxHealth;
-    ctx.fillStyle = "red";
-    ctx.fillRect(barX, barY, barWidth * healthPercent, barHeight);
-
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(barX, barY, barWidth, barHeight);
-
-    ctx.fillStyle = "white";
-    ctx.font = "20px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(
-        `${Math.floor(sprite.health)} / ${sprite.maxHealth}`,
-        barX + barWidth / 2,
-        barY + barHeight - 4
-    );
-
-    // ----------------------
-    // PLAYER XP BAR
-    // ----------------------
-
-    ctx.fillStyle = "#000055";
-    ctx.fillRect(barX, barY+30, barWidth, barHeight);
-
-    const xpPercent = sprite.xp / sprite.maxXP;
-    ctx.fillStyle = "blue";
-    ctx.fillRect(barX, barY+30, barWidth * xpPercent, barHeight);
-
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(barX, barY+30, barWidth, barHeight);
-
-    ctx.fillStyle = "white";
-    ctx.font = "20px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(
-        `${Math.floor(sprite.xp)} / ${sprite.maxXP}`,
-        barX + barWidth / 2,
-        barY+30 + barHeight - 4
-    );
-
-    // ----------------------
-    // ELAPSED TIME (TOP CENTER)
-    // ----------------------
-    const minutes = Math.floor(elapsedTime / 60);
-    const seconds = elapsedTime % 60;
-    const formatted = `${minutes}:${seconds.toString().padStart(2, "0")}`;
-
-    ctx.fillStyle = "white";
-    ctx.font = "28px Arial";
-    ctx.textAlign = "left";
-    ctx.fillText(formatted, barX + barWidth + 30, barY + barHeight - 2);
-
-    // ----------------------
-    // WAVE INFORMATION
-    // ----------------------
-    ctx.fillStyle = "white";
-    ctx.font = "24px Arial";
-    ctx.textAlign = "right";
-    ctx.fillText(`Wave: ${currentWave}`, canvas.width - 20, barY + 20);
-
-    if (waveActive && !waveCompleted) {
-        const waveElapsed = (timestamp - waveStartTime) / 1000;
-        const waveRemaining = Math.max(0, waveTimer - waveElapsed);
-        const waveMinutes = Math.floor(waveRemaining / 60);
-        const waveSeconds = Math.floor(waveRemaining % 60);
-        const waveFormatted = `${waveMinutes}:${waveSeconds.toString().padStart(2, "0")}`;
-
-        ctx.fillText(`Wave Timer: ${waveFormatted}`, canvas.width - 20, barY + 50);
-        ctx.fillText(`Enemies: ${Entities.length}`, canvas.width - 20, barY + 80);
-    }
-
-
-
-    // ----------------------
-    // DEATH SCREEN
-    // ----------------------
-    if (isDead) {
-        drawDeathScreen();
-    }
-
-    requestAnimationFrame(animate);
-}
-
-function drawTiles() {
-    let grass = new Image(tileSize, tileSize);
-    grass.src = "assets/Grass.png";
-
-    for (let x = -tileSize; x < canvas.width + tileSize; x += tileSize) {
-        for (let y = -tileSize; y < canvas.height + tileSize; y += tileSize) {
-            ctx.drawImage(
-                grass,
-                x + tileOffsetX,
-                y + tileOffsetY,
-                tileSize,
-                tileSize
-            );
-        }
+    // Pass deltaTime to update
+    this.update(deltaTime); 
+    this.draw();
+    requestAnimationFrame(this.animate);
     }
 }
-
-function drawEntities(){
-
-    XP_Orbs.forEach(Orb => {
-        Orb.draw(ctx, gameFrame);
-    })
-
-    // ----------------------
-    // DRAW PLAYER + ENTITIES
-    // ----------------------
-    const screenX = sprite.x;
-    const screenY = sprite.y;
-
-    let drawn = false;
-
-    Entities.forEach(entity => {
-        if (!drawn) {
-            if (entity.Y > sprite.y) {
-                sprite.draw(ctx, gameFrame, screenX, screenY);
-                drawn = true;
-            } else if (entity.X < sprite.y && entity.Y === sprite.y) {
-                sprite.draw(ctx, gameFrame, screenX, screenY);
-                drawn = true;
-            }
-        }
-        entity.draw(ctx, gameFrame);
-    });
-
-    if (!drawn) {
-        sprite.draw(ctx, gameFrame, screenX, screenY);
-    }
-
-
-}
-
-function drawUI(){
-
-}
-
-requestAnimationFrame(animate);

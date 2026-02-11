@@ -1,67 +1,73 @@
-class Sprite {
-    constructor(pngPath) {
+export default class Sprite {
+    constructor(pngPath, config = {}) {
+        this.x = config.x || 0;
+        this.y = config.y || 0;
+        
+        // Default sheet configuration
+        this.sheetWidth = config.sheetWidth || 512;
+        this.sheetHeight = config.sheetHeight || 1024;
+        this.cols = config.cols || 4;
+        this.rows = config.rows || 8;
 
-        // Known sheet dimensions
-        this.sheetWidth = 512;
-        this.sheetHeight = 1024;
-        this.cols = 4;
-        this.rows = 8;
+        this.frameWidth = this.sheetWidth / this.cols;
+        this.frameHeight = this.sheetHeight / this.rows;
 
-        // Safe defaults so SpriteTest and EntityTest never freeze
-        this.frameWidth = this.sheetWidth / this.cols;   // 128
-        this.frameHeight = this.sheetHeight / this.rows; // 128
-
-        this.direction = 0; // 0 forward, 1 right, 2 left, 3 backward
+        // Animation state
+        this.direction = 0; // 0:Forward, 1:Right, 2:Left, 3:Backward
         this.moving = false;
+        this.markedForDeletion = false;
 
-        this.x = 0;
-        this.y = 0;
-
-        // Load flag
+        // Image Loading
         this.loaded = false;
-
-        // Load image
         this.image = new Image();
         this.image.onload = () => {
             this.loaded = true;
-
-            // Recompute real frame sizes from actual image
+            // Optional: Recalculate frame size if image is different than expected
             this.frameWidth = this.image.width / this.cols;
             this.frameHeight = this.image.height / this.rows;
         };
         this.image.src = pngPath;
     }
 
-    setDirection(num) {
-        this.direction = num;
+    // AABB Collision (Box)
+    checkCollision(other) {
+        return (
+            this.x < other.x + other.frameWidth &&
+            this.x + this.frameWidth > other.x &&
+            this.y < other.y + other.frameHeight &&
+            this.y + this.frameHeight > other.y
+        );
     }
 
-    startMoving() {
-        this.moving = true;
-    }
+    // Distance-based Collision (Circle)
+    getDistance(other) {
+        // Calculate center points
+        const cx1 = this.x + this.frameWidth / 2;
+        const cy1 = this.y + this.frameHeight / 2;
+        const cx2 = other.x + other.frameWidth / 2;
+        const cy2 = other.y + other.frameHeight / 2;
 
-    stopMoving() {
-        this.moving = false;
+        return Math.hypot(cx2 - cx1, cy2 - cy1);
     }
 
     draw(ctx, gameFrame, screenX, screenY) {
-
-        // Prevent freeze: do not draw until image is ready
         if (!this.loaded) return;
 
         // row = direction * 2 + (moving ? 1 : 0)
+        // This formula assumes the 4x8 sprite sheet layout
         const row = this.direction * 2 + (this.moving ? 1 : 0);
         const col = this.moving ? (gameFrame % this.cols) : 0;
 
-        const sx = col * this.frameWidth;
-        const sy = row * this.frameHeight;
-
         ctx.drawImage(
             this.image,
-            sx, sy,
-            this.frameWidth, this.frameHeight,
-            screenX, screenY,
-            this.frameWidth, this.frameHeight
+            col * this.frameWidth, row * this.frameHeight, // Source X, Y
+            this.frameWidth, this.frameHeight,             // Source W, H
+            screenX, screenY,                              // Dest X, Y
+            this.frameWidth, this.frameHeight              // Dest W, H
         );
+
+        // DEBUG: Uncomment to see hitboxes
+        // ctx.strokeStyle = "red";
+        // ctx.strokeRect(screenX, screenY, this.frameWidth, this.frameHeight);
     }
 }
