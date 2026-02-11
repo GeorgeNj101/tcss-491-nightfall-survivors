@@ -27,6 +27,11 @@ export default class Sprite {
             this.frameHeight = this.image.height / this.rows;
         };
         this.image.src = pngPath;
+
+        this.radius = config.radius || (this.frameWidth / 2.5); 
+        
+        // Debug mode to see hitboxes (toggle this to true to see circles)
+        this.showHitbox = false;
     }
 
     // AABB Collision (Box)
@@ -50,6 +55,18 @@ export default class Sprite {
         return Math.hypot(cx2 - cx1, cy2 - cy1);
     }
 
+    collidesWith(other) {
+        // 1. Get centers
+        const dx = (this.x + this.frameWidth/2) - (other.x + other.frameWidth/2);
+        const dy = (this.y + this.frameHeight/2) - (other.y + other.frameHeight/2);
+        
+        // 2. Get distance
+        const distance = Math.hypot(dx, dy);
+
+        // 3. Check if circles overlap
+        return distance < (this.radius + other.radius);
+    }
+
     draw(ctx, gameFrame, screenX, screenY) {
         if (!this.loaded) return;
 
@@ -66,8 +83,18 @@ export default class Sprite {
             this.frameWidth, this.frameHeight              // Dest W, H
         );
 
-        // DEBUG: Uncomment to see hitboxes
-        // ctx.strokeStyle = "red";
-        // ctx.strokeRect(screenX, screenY, this.frameWidth, this.frameHeight);
+        if (this.showHitbox) {
+            ctx.beginPath();
+            ctx.strokeStyle = "red";
+            ctx.lineWidth = 2;
+            ctx.arc(
+                screenX + this.frameWidth / 2, 
+                screenX + this.frameHeight / 2, 
+                this.radius, 
+                0, Math.PI * 2
+            );
+            ctx.stroke();
+        }
     }
+    
 }

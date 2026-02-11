@@ -20,6 +20,7 @@ export default class Game {
         this.isDead = false;
         this.elapsedTime = 0;
         this.lastSecondTime = 0;
+        this.lastTime = 0;
         this.score = 0; // Fixed: Added score back to constructor
 
         // --- Player Stats ---
@@ -169,33 +170,55 @@ export default class Game {
         }
 
         // 2. Projectile Logic (Movement + Collision)
-        this.projectiles.forEach(p => {
-            p.update();
+        // this.projectiles.forEach(p => {
+        //     p.update();
             
-            // Check collision with its target
-            if (p.target && !p.target.markedForDeletion) {
-                const dist = p.getDistance(p.target);
-                if (dist < 30) { // Hit!
-                    console.log("DEBUG: Projectile Hit! Enemy Defeated."); // --- DEBUG LOG ---
-                    p.markedForDeletion = true;
-                    p.target.markedForDeletion = true;
+        //     // Check collision with its target
+        //     if (p.target && !p.target.markedForDeletion) {
+        //         const dist = p.getDistance(p.target);
+        //         if (dist < 30) { // Hit!
+        //             console.log("DEBUG: Projectile Hit! Enemy Defeated."); // --- DEBUG LOG ---
+        //             p.markedForDeletion = true;
+        //             p.target.markedForDeletion = true;
                     
-                    // DROP XP ORB HERE
-                    console.log(`DEBUG: Spawning XP Orb at ${p.target.x}, ${p.target.y}`); // --- DEBUG LOG ---
-                    this.xpOrbs.push(new XpOrb(p.target.x, p.target.y));
+        //             // DROP XP ORB HERE
+        //             console.log(`DEBUG: Spawning XP Orb at ${p.target.x}, ${p.target.y}`); // --- DEBUG LOG ---
+        //             this.xpOrbs.push(new XpOrb(p.target.x, p.target.y));
                     
+        //             this.score += 10;
+        //         }
+        //     }
+        // });
+        // this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
+        this.projectiles.forEach(projectile => {
+        projectile.update();
+            
+            // Check this projectile against ALL enemies
+            // (We iterate backwards so we can safely remove enemies from the array)
+            for (let i = this.enemies.length - 1; i >= 0; i--) {
+                const enemy = this.enemies[i];
+                
+                // CLEAN SYNTAX HERE:
+                if (projectile.collidesWith(enemy)) {
+                    console.log(`DEBUG: Hit! Enemy at ${Math.floor(enemy.x)},${Math.floor(enemy.y)}`);
+                    // Logic
+                    enemy.markedForDeletion = true;
+                    projectile.markedForDeletion = true;
+                    this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
                     this.score += 10;
+                    console.log(`DEBUG: XP Orb spawned. Total Orbs: ${this.xpOrbs.length}`);
+                    
+                    break; // Bullet hit something, stop checking other enemies for this bullet
                 }
             }
         });
-        this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
 
         // 3. Enemy Logic (Movement + Player Collision)
         this.enemies.forEach(enemy => {
             enemy.update(this.player.x, this.player.y);
-            const dist = enemy.getDistance(this.player);
+            // const dist = enemy.getDistance(this.player);
 
-            if (dist < 40) {
+            if (this.player.collidesWith(enemy)) {
                 // if (this.isFacing(enemy)) {
                 //     // Player melee attack
                 //     console.log("DEBUG: Melee Stab! Enemy Defeated."); // --- DEBUG LOG ---
@@ -207,11 +230,13 @@ export default class Game {
                 //     // Player takes damage
                 //     this.stats.hp -= 5;
                 // }
-                this.stats.hp -= 30;
+                
                 enemy.markedForDeletion = true;
-                console.log("DEBUG: Enemy Collision! Player takes damage."); // --- DEBUG LOG ---
+                this.stats.hp -= 30;
+                console.log(`DEBUG: Player Hit! HP: ${this.stats.hp}`);// --- DEBUG LOG ---
             }
         });
+        this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
         this.enemies = this.enemies.filter(e => !e.markedForDeletion);
     }
 
@@ -224,8 +249,9 @@ export default class Game {
                 orb.x += moveX;
                 orb.y += moveY;
             }
-            if (dist < 30) {
+            if (this.player.collidesWith(orb)) {
                 orb.markedForDeletion = true;
+                console.log("DEBUG: Orb Collected!");
                 this.stats.xp++;
                 if (this.stats.xp >= this.stats.maxXp) this.levelUp();
             }
@@ -363,16 +389,17 @@ export default class Game {
     }
 
     animate(timestamp) {
-        // this.update(timestamp);
-        // this.draw(timestamp);
-        // requestAnimationFrame(this.animate);
-        // Calculate time difference
+       // Handle first frame edge case
+    if (!this.lastTime) this.lastTime = timestamp;
+
     const deltaTime = timestamp - this.lastTime;
     this.lastTime = timestamp;
 
-    // Pass deltaTime to update
     this.update(deltaTime); 
-    this.draw();
+    
+    // --- FIX: Pass timestamp to draw() so the UI timer works ---
+    this.draw(timestamp); 
+    
     requestAnimationFrame(this.animate);
     }
 }

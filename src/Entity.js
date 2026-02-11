@@ -2,7 +2,7 @@ import Sprite from "./Sprite.js";
 
 export default class Entity extends Sprite {
     constructor(camera) {
-        super("assets/Chicken_Enemy.png");
+        super("assets/Chicken_Enemy.png", {radius: 20});
         this.spawn(camera);
         this.speed = 2; // Slower than player
     }

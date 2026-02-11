@@ -3,7 +3,7 @@ import Sprite from "./Sprite.js";
 export default class Projectile extends Sprite {
     constructor(x, y, target) {
         // Bolt is a single image, treat as 1 col / 1 row
-        super("assets/Bolt.png", { x, y, cols: 1, rows: 1 });
+        super("assets/Bolt.png", { x, y, cols: 1, rows: 1, radius: 10});
         
         this.target = target;
         this.speed = 12;
