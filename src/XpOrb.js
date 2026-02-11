@@ -2,19 +2,38 @@ import Sprite from "./Sprite.js";
 
 export default class XpOrb extends Sprite {
     constructor(x, y) {
-        // We use the Sprite constructor to load the sheet
         super("assets/Xp_Orb.png", { 
             x: x, 
             y: y, 
             cols: 7, 
             rows: 1,
-            sheetWidth: 224, // 32 pixels * 7 frames
-            sheetHeight: 32
+            sheetWidth: 224, 
+            sheetHeight: 32,
+            radius: 15 
         });
-        this.moving = true; // Orbs are always animating/spinning
     }
 
-    update() {
-        // You can add logic here if you want orbs to bob up and down
+    draw(ctx, gameFrame, screenX, screenY) {
+        if (!this.loaded) return;
+        const row = 0; 
+        
+        // Cycle columns for spinning animation
+        // We use Math.floor to slow it down (change / 5 to adjust speed)
+        const col = Math.floor(gameFrame / 5) % this.cols; 
+
+        ctx.drawImage(
+            this.image,
+            col * this.frameWidth, row * this.frameHeight, 
+            this.frameWidth, this.frameHeight,            
+            screenX, screenY,                              
+            this.frameWidth, this.frameHeight              
+        );
+
+        if (this.showHitbox) {
+            ctx.beginPath();
+            ctx.strokeStyle = "yellow";
+            ctx.arc(screenX + this.frameWidth/2, screenY + this.frameHeight/2, this.radius, 0, Math.PI*2);
+            ctx.stroke();
+        }
     }
 }

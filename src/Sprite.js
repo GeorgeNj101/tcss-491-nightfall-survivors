@@ -3,7 +3,7 @@ export default class Sprite {
         this.x = config.x || 0;
         this.y = config.y || 0;
         
-        // Default sheet configuration
+
         this.sheetWidth = config.sheetWidth || 512;
         this.sheetHeight = config.sheetHeight || 1024;
         this.cols = config.cols || 4;
@@ -13,7 +13,7 @@ export default class Sprite {
         this.frameHeight = this.sheetHeight / this.rows;
 
         // Animation state
-        this.direction = 0; // 0:Forward, 1:Right, 2:Left, 3:Backward
+        this.direction = 0; 
         this.moving = false;
         this.markedForDeletion = false;
 
@@ -30,11 +30,11 @@ export default class Sprite {
 
         this.radius = config.radius || (this.frameWidth / 2.5); 
         
-        // Debug mode to see hitboxes (toggle this to true to see circles)
-        this.showHitbox = false;
+        // see hitboxes
+        this.showHitbox = true;
     }
 
-    // AABB Collision (Box)
+   
     checkCollision(other) {
         return (
             this.x < other.x + other.frameWidth &&
@@ -67,6 +67,8 @@ export default class Sprite {
         return distance < (this.radius + other.radius);
     }
 
+    
+
     draw(ctx, gameFrame, screenX, screenY) {
         if (!this.loaded) return;
 
@@ -83,16 +85,11 @@ export default class Sprite {
             this.frameWidth, this.frameHeight              // Dest W, H
         );
 
+    
         if (this.showHitbox) {
             ctx.beginPath();
             ctx.strokeStyle = "red";
-            ctx.lineWidth = 2;
-            ctx.arc(
-                screenX + this.frameWidth / 2, 
-                screenX + this.frameHeight / 2, 
-                this.radius, 
-                0, Math.PI * 2
-            );
+            ctx.arc(screenX + this.frameWidth/2, screenY + this.frameHeight/2, this.radius, 0, Math.PI*2);
             ctx.stroke();
         }
     }

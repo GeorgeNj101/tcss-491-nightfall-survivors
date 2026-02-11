@@ -158,18 +158,133 @@ export default class Game {
         // Update Camera to follow player
         // this.camera.update(this.player);
     }
-
     handleCombat() {
-        // 1. Auto-Fire Projectiles
-        if (this.stats.attackTimer >= this.stats.attackCooldown) {
-            const target = this.getNearestEnemy();
-            if (target) {
-                this.projectiles.push(new Projectile(this.player.x, this.player.y, target));
-                this.stats.attackTimer = 0;
+         if (this.stats.attackTimer >= this.stats.attackCooldown) {
+        
+            // Center the spawn point on the player
+            const spawnX = this.player.x + this.player.frameWidth / 2 - 16; 
+            const spawnY = this.player.y + this.player.frameHeight / 2 - 16;
+
+            // Define the 4 diagonal directions
+            const directions = [
+                { x: 1,  y: -1 }, // NE (Right-Up)
+                { x: 1,  y: 1 },  // SE (Right-Down)
+                { x: -1, y: 1 },  // SW (Left-Down)
+                { x: -1, y: -1 }  // NW (Left-Up)
+            ];
+
+            directions.forEach(dir => {
+                // Normalize the vector so diagonal speed isn't faster
+                // Math.hypot(1, 1) is approx 1.414
+                const length = Math.hypot(dir.x, dir.y); 
+                const dx = dir.x / length;
+                const dy = dir.y / length;
+
+                this.projectiles.push(new Projectile(spawnX, spawnY, dx, dy));
+            });
+
+            this.stats.attackTimer = 0;
+    }
+    // 1. Check Projectiles vs Enemies
+    // Iterate backwards through projectiles so we can remove them safely
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+        const p = this.projectiles[i];
+        p.update();
+
+        // Check this single projectile against ALL enemies
+        for (let j = this.enemies.length - 1; j >= 0; j--) {
+            const enemy = this.enemies[j];
+
+            // THE COLLISION CHECK
+            if (p.collidesWith(enemy)) {
+                console.log("Hit registered!"); // Debug log
+                
+                // Kill Enemy
+                enemy.markedForDeletion = true;
+                
+                // Destroy Projectile
+                p.markedForDeletion = true;
+
+                // Spawn XP Orb at Enemy position
+                this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
+                this.score += 10;
+
+                // Break loop: This bullet can't kill 2 enemies at once
+                break; 
             }
         }
+    }
 
-        // 2. Projectile Logic (Movement + Collision)
+    // 2. Check Enemies vs Player
+    this.enemies.forEach(enemy => {
+        enemy.update(this.player.x, this.player.y);
+        
+        if (this.player.collidesWith(enemy)) {
+            // Optional: Cooldown to prevent instant death
+            if (this.stats.hp > 0) {
+                 this.stats.hp -= 0.5;
+            }
+        }
+    });
+
+    // 3. Filter out dead objects
+    this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
+    this.enemies = this.enemies.filter(e => !e.markedForDeletion);
+}
+    handleCombat1() {
+        //  Auto-Fire Projectiles
+        // if (this.stats.attackTimer >= this.stats.attackCooldown) {
+        //     const target = this.getNearestEnemy();
+        //     if (target) {
+        //         this.projectiles.push(new Projectile(this.player.x, this.player.y, target));
+        //         this.stats.attackTimer = 0;
+        //     }
+        // }
+        //
+        if (this.stats.attackTimer >= this.stats.attackCooldown) {
+        
+            // Center the spawn point on the player
+            const spawnX = this.player.x + this.player.frameWidth / 2 - 16; 
+            const spawnY = this.player.y + this.player.frameHeight / 2 - 16;
+
+            // Define the 4 diagonal directions
+            const directions = [
+                { x: 1,  y: -1 }, // NE (Right-Up)
+                { x: 1,  y: 1 },  // SE (Right-Down)
+                { x: -1, y: 1 },  // SW (Left-Down)
+                { x: -1, y: -1 }  // NW (Left-Up)
+            ];
+
+            directions.forEach(dir => {
+                // Normalize the vector so diagonal speed isn't faster
+                // Math.hypot(1, 1) is approx 1.414
+                const length = Math.hypot(dir.x, dir.y); 
+                const dx = dir.x / length;
+                const dy = dir.y / length;
+
+                this.projectiles.push(new Projectile(spawnX, spawnY, dx, dy));
+            });
+
+            this.stats.attackTimer = 0;
+    }
+    this.projectiles.forEach(projectile => {
+        projectile.update();
+        for(let i = 0; i < this.enemies.length; i++) {
+            const enemy = this.enemies[i];
+            if (projectile.collidesWith(enemy)) {
+                console.log(`DEBUG: Hit! Enemy at ${Math.floor(enemy.x)},${Math.floor(enemy.y)}`);
+                // Logic
+                enemy.markedForDeletion = true;
+                projectile.markedForDeletion = true;
+                this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
+                this.score += 10;
+                
+                break; // Bullet hit something, stop checking other enemies for this bullet
+            }
+        }   
+    });
+
+
         // this.projectiles.forEach(p => {
         //     p.update();
             
@@ -190,28 +305,28 @@ export default class Game {
         //     }
         // });
         // this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
-        this.projectiles.forEach(projectile => {
-        projectile.update();
+        // this.projectiles.forEach(projectile => {
+        // projectile.update();
             
-            // Check this projectile against ALL enemies
-            // (We iterate backwards so we can safely remove enemies from the array)
-            for (let i = this.enemies.length - 1; i >= 0; i--) {
-                const enemy = this.enemies[i];
+        //     // Check this projectile against ALL enemies
+        //     // (We iterate backwards so we can safely remove enemies from the array)
+        //     for (let i = this.enemies.length - 1; i >= 0; i--) {
+        //         const enemy = this.enemies[i];
                 
-                // CLEAN SYNTAX HERE:
-                if (projectile.collidesWith(enemy)) {
-                    console.log(`DEBUG: Hit! Enemy at ${Math.floor(enemy.x)},${Math.floor(enemy.y)}`);
-                    // Logic
-                    enemy.markedForDeletion = true;
-                    projectile.markedForDeletion = true;
-                    this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
-                    this.score += 10;
-                    console.log(`DEBUG: XP Orb spawned. Total Orbs: ${this.xpOrbs.length}`);
+        //         // CLEAN SYNTAX HERE:
+        //         if (projectile.collidesWith(enemy)) {
+        //             console.log(`DEBUG: Hit! Enemy at ${Math.floor(enemy.x)},${Math.floor(enemy.y)}`);
+        //             // Logic
+        //             enemy.markedForDeletion = true;
+        //             projectile.markedForDeletion = true;
+        //             this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
+        //             this.score += 10;
+        //             console.log(`DEBUG: XP Orb spawned. Total Orbs: ${this.xpOrbs.length}`);
                     
-                    break; // Bullet hit something, stop checking other enemies for this bullet
-                }
-            }
-        });
+        //             break; // Bullet hit something, stop checking other enemies for this bullet
+        //         }
+        //     }
+        // });
 
         // 3. Enemy Logic (Movement + Player Collision)
         this.enemies.forEach(enemy => {
@@ -232,7 +347,7 @@ export default class Game {
                 // }
                 
                 enemy.markedForDeletion = true;
-                this.stats.hp -= 30;
+                this.stats.hp -=10;
                 console.log(`DEBUG: Player Hit! HP: ${this.stats.hp}`);// --- DEBUG LOG ---
             }
         });
