@@ -2,6 +2,7 @@ import Sprite from "./Sprite.js";
 import Entity from "./Entity.js";
 import XpOrb from "./XpOrb.js";
 import Projectile from "./Projectile.js";
+import Boss from "./Boss.js";
 import Camera from "./Camera.js";
 
 export default class Game {
@@ -45,6 +46,7 @@ export default class Game {
         this.waveTimer = 60; // seconds
         this.waveStartTime = 0;
         this.waveEnemiesSpawned = false;
+        this.bossSpawned = false;
 
         // --- World ---
         this.tileOffsetX = 0;
@@ -111,6 +113,13 @@ export default class Game {
             this.waveTimer = Math.max(30, this.waveTimer - 5);
             this.waveStartTime = timestamp;
             this.waveEnemiesSpawned = false;
+        }
+
+        // Spawn a boss after 10 waves have been completed
+        if (this.wave > 10 && !this.bossSpawned) {
+            console.log("Spawning Boss: wave > 10");
+            this.enemies.push(new Boss(this.camera));
+            this.bossSpawned = true;
         }
     }
 
@@ -198,15 +207,31 @@ export default class Game {
             if (p.collidesWith(enemy)) {
                 console.log("Hit registered!"); // Debug log
                 
-                // Kill Enemy
-                enemy.markedForDeletion = true;
-                
-                // Destroy Projectile
-                p.markedForDeletion = true;
+                // If enemy has HP (boss), reduce HP; otherwise kill instantly
+                if (typeof enemy.hp === 'number') {
+                    // Damage amount for a single projectile
+                    const dmg = 50;
+                    enemy.hp -= dmg;
+                    console.log(`Boss hit! HP: ${enemy.hp}`);
+                    p.markedForDeletion = true;
+                    if (enemy.hp <= 0) {
+                        enemy.markedForDeletion = true;
+                        // Spawn multiple XP orbs for boss
+                        for (let k = 0; k < 8; k++) {
+                            this.xpOrbs.push(new XpOrb(enemy.x + (Math.random()-0.5)*40, enemy.y + (Math.random()-0.5)*40));
+                        }
+                        this.score += 250;
+                    }
+                } else {
+                    // Kill Enemy
+                    enemy.markedForDeletion = true;
+                    // Destroy Projectile
+                    p.markedForDeletion = true;
 
-                // Spawn XP Orb at Enemy position
-                this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
-                this.score += 10;
+                    // Spawn XP Orb at Enemy position
+                    this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
+                    this.score += 10;
+                }
 
                 // Break loop: This bullet can't kill 2 enemies at once
                 break; 
@@ -216,13 +241,19 @@ export default class Game {
 
     // 2. Check Enemies vs Player
     this.enemies.forEach(enemy => {
-        enemy.update(this.player.x, this.player.y);
+        enemy.update(this.player.x, this.player.y, this);
         
         if (this.player.collidesWith(enemy)) {
-            // Optional: Cooldown to prevent instant death
-            if (this.stats.hp > 0) {
-                 this.stats.hp -= 0.5;
-            }
+                // If this is a boss (has hp), don't auto-kill it on touch; just damage player
+                if (typeof enemy.hp === 'number') {
+                    if (this.stats.hp > 0) this.stats.hp -= 1;
+                } else {
+                    // Optional: Cooldown to prevent instant death
+                    if (this.stats.hp > 0) {
+                         this.stats.hp -= 0.5;
+                    }
+                    enemy.markedForDeletion = true;
+                }
         }
     });
 
@@ -272,12 +303,25 @@ export default class Game {
             const enemy = this.enemies[i];
             if (projectile.collidesWith(enemy)) {
                 console.log(`DEBUG: Hit! Enemy at ${Math.floor(enemy.x)},${Math.floor(enemy.y)}`);
-                // Logic
-                enemy.markedForDeletion = true;
-                projectile.markedForDeletion = true;
-                this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
-                this.score += 10;
-                
+                // If boss (has hp), apply damage
+                if (typeof enemy.hp === 'number') {
+                    const dmg = 50;
+                    enemy.hp -= dmg;
+                    projectile.markedForDeletion = true;
+                    if (enemy.hp <= 0) {
+                        enemy.markedForDeletion = true;
+                        for (let k = 0; k < 8; k++) {
+                            this.xpOrbs.push(new XpOrb(enemy.x + (Math.random()-0.5)*40, enemy.y + (Math.random()-0.5)*40));
+                        }
+                        this.score += 250;
+                    }
+                } else {
+                    enemy.markedForDeletion = true;
+                    projectile.markedForDeletion = true;
+                    this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
+                    this.score += 10;
+                }
+
                 break; // Bullet hit something, stop checking other enemies for this bullet
             }
         }   
@@ -329,25 +373,20 @@ export default class Game {
 
         // 3. Enemy Logic (Movement + Player Collision)
         this.enemies.forEach(enemy => {
-            enemy.update(this.player.x, this.player.y);
+            enemy.update(this.player.x, this.player.y, this);
             // const dist = enemy.getDistance(this.player);
 
             if (this.player.collidesWith(enemy)) {
-                // if (this.isFacing(enemy)) {
-                //     // Player melee attack
-                //     console.log("DEBUG: Melee Stab! Enemy Defeated."); // --- DEBUG LOG ---
-                //     enemy.markedForDeletion = true;
-                    
-                //     console.log(`DEBUG: Spawning XP Orb at ${enemy.x}, ${enemy.y}`); // --- DEBUG LOG ---
-                //     this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
-                // } else if (this.gameFrame % 20 === 0) {
-                //     // Player takes damage
-                //     this.stats.hp -= 5;
-                // }
-                
-                enemy.markedForDeletion = true;
-                this.stats.hp -=10;
-                console.log(`DEBUG: Player Hit! HP: ${this.stats.hp}`);// --- DEBUG LOG ---
+                if (typeof enemy.hp === 'number') {
+                    // Boss collision: damage player only
+                    this.stats.hp -= 5;
+                    console.log(`DEBUG: Player Hit by Boss! HP: ${this.stats.hp}`);
+                } else {
+                    // Non-boss: kill enemy and damage player
+                    enemy.markedForDeletion = true;
+                    this.stats.hp -=10;
+                    console.log(`DEBUG: Player Hit! HP: ${this.stats.hp}`);// --- DEBUG LOG ---
+                }
             }
         });
         this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
