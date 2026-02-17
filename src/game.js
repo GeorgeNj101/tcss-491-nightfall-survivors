@@ -23,6 +23,9 @@ export default class Game {
         this.lastTime = 0;
         this.score = 0;
 
+        //FOR CHEATS/DEBUGGING
+        this.cheatLocked = false;
+
         // --- Player Stats ---
         this.player = new Sprite("assets/Main_Character.png");
         this.player.x = this.width / 2 - 64; 
@@ -33,10 +36,10 @@ export default class Game {
             hp: 100,
             maxHp: 100,
             xp: 0,
-            maxXp: 10,
+            maxXp: 5,//changed temperoarily for testing
             level: 1,
             speed: 4,
-            attackCooldown: 60,
+            attackCooldown: 180,
             attackTimer: 0
         };
 
@@ -64,6 +67,7 @@ export default class Game {
             if (this.isDead && e.key.toLowerCase() === 'r') location.reload();
         });
         window.addEventListener("keyup", e => this.keys[e.key] = false);
+        
         
         this.animate = this.animate.bind(this);
         requestAnimationFrame(this.animate);
@@ -116,8 +120,8 @@ export default class Game {
         }
 
         // Spawn a boss after 10 waves have been completed
-        if (this.wave > 10 && !this.bossSpawned) {
-            console.log("Spawning Boss: wave > 10");
+        if (this.wave > 2 && !this.bossSpawned) {
+            console.log("Spawning Boss: wave > 1");
             this.enemies.push(new Boss(this.camera));
             this.bossSpawned = true;
         }
@@ -129,7 +133,22 @@ export default class Game {
         if (this.keys["s"] || this.keys["ArrowDown"]) { dy = 1; this.player.direction = 0; }
         if (this.keys["a"] || this.keys["ArrowLeft"]) { dx = -1; this.player.direction = 2; }
         if (this.keys["d"] || this.keys["ArrowRight"]) { dx = 1; this.player.direction = 1; }
-
+        if (this.keys["Shift"]) {this.stats.speed = 6; console.log("DEBUG: Sprinting");}
+        if (!this.keys["Shift"]) {this.stats.speed = 4; }
+        this.levelActivation = false;
+       
+        if (this.keys["x"]) {
+            // Only run if NOT locked
+            if (!this.cheatLocked) {
+                this.levelUp();
+                console.log("DEBUG: Level Up (Cheat)");
+                this.cheatLocked = true; // Lock it immediately
+            }
+        } else {
+            // If "x" is NOT pressed, unlock it so we can press it again later
+            this.cheatLocked = false;
+        }
+        
         // if (dx !== 0 || dy !== 0) {
         //     this.player.moving = true;
         //     const moveSpeed = this.stats.speed;
@@ -234,7 +253,7 @@ export default class Game {
                 }
 
                 // Break loop: This bullet can't kill 2 enemies at once
-                break; 
+                
             }
         }
     }
@@ -246,11 +265,11 @@ export default class Game {
         if (this.player.collidesWith(enemy)) {
                 // If this is a boss (has hp), don't auto-kill it on touch; just damage player
                 if (typeof enemy.hp === 'number') {
-                    if (this.stats.hp > 0) this.stats.hp -= 1;
+                    if (this.stats.hp > 0) this.stats.hp -= .05;
                 } else {
                     // Optional: Cooldown to prevent instant death
                     if (this.stats.hp > 0) {
-                         this.stats.hp -= 0.5;
+                         this.stats.hp -= 20;
                     }
                     enemy.markedForDeletion = true;
                 }
@@ -417,7 +436,16 @@ export default class Game {
         this.stats.xp = 0;
         this.stats.maxXp = Math.floor(this.stats.maxXp * 1.5);
         this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + 20);
+        this.stats.maxHp += 10;
         console.log("DEBUG: Level Up! Level " + this.stats.level);
+        if (this.stats.level % 5 === 0) {
+            this.stats.speed = Math.min(10, this.stats.speed + 1);
+            console.log("DEBUG: Speed Increased! Speed: " + this.stats.speed);
+        }
+        if (this.stats.level % 3 === 0 ){
+            this.stats.attackCooldown = Math.max(30, this.stats.attackCooldown - 20);
+            console.log("DEBUG: Attack Speed Increased! Cooldown: " + this.stats.attackCooldown);
+        }
     }
 
     getNearestEnemy() {
@@ -510,6 +538,9 @@ export default class Game {
         
         ctx.textAlign = "left";
         ctx.fillText(`Time: ${Math.floor(this.elapsedTime / 60)}:${(this.elapsedTime % 60).toString().padStart(2, '0')}`, 240, 40);
+        ctx.textAlign = "left";
+        ctx.fillText(`level: ${this.stats.level}`, 240, 70);
+        
         
         ctx.textAlign = "right";
         ctx.fillText(`Wave: ${this.wave}`, this.width - 20, 40);

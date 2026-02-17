@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../Downloads/Beaches-N-Barrels-main-2"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "tcss-491-nightfall-survivors",
+		"liveServer.settings.port": 5501
+	}
+}

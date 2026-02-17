@@ -17,8 +17,7 @@ export default class XpOrb extends Sprite {
         if (!this.loaded) return;
         const row = 0; 
         
-        // Cycle columns for spinning animation
-        // We use Math.floor to slow it down (change / 5 to adjust speed)
+    
         const col = Math.floor(gameFrame / 5) % this.cols; 
 
         ctx.drawImage(

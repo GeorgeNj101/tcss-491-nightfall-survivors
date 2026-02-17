@@ -9,17 +9,17 @@ export default class Boss extends Entity {
         // Expected: place a boss sprite sheet at `assets/Boss.png`.
         // Recommended layout: 4 columns x 4 rows (idle/move/attack frames).
         this.cols = 4;
-        this.rows = 4;
+        this.rows = 8;
         this.radius = 60; // larger collision radius for boss
 
         // Replace the image source so Sprite's onload recalculates frames
-        this.image.src = "assets/Boss.png";
+        this.image.src = "assets/Chicken_Enemy.png"; // Use same image for now, but can be swapped for a boss sprite sheet
 
         this.maxHp = 500;
         this.hp = this.maxHp;
 
         // Boss is faster than normal enemies
-        this.speed = 3.5;
+        this.speed = 2.0;
 
         // Shooting
         this.attackCooldown = 90; // frames
