@@ -70,11 +70,20 @@ export default class Game {
         
         
         this.animate = this.animate.bind(this);
+        // UI state: 'title' | 'controls' | 'playing'
+        this.screen = 'title';
+
+        // Add click handler for title/controls buttons
+        this.canvas.addEventListener('click', e => this.handleClick(e));
+
         requestAnimationFrame(this.animate);
     }
 
     update(timestamp) {
         if (this.isDead) return;
+
+        // Only run game updates when playing
+        if (this.screen !== 'playing') return;
 
         this.gameFrame++;
         this.updateTimers(timestamp);
@@ -470,6 +479,20 @@ export default class Game {
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.drawBackground();
 
+        // If we're on title or controls screens, show those and skip game rendering
+        if (this.screen === 'title') {
+            this.drawTitleScreen(timestamp);
+            return;
+        }
+        if (this.screen === 'controls') {
+            this.drawControlsScreen(timestamp);
+            return;
+        }
+        if (this.screen === 'credits') {
+            this.drawCreditsScreen(timestamp);
+            return;
+        }
+
         const renderList = [this.player, ...this.enemies, ...this.xpOrbs, ...this.projectiles];
         renderList.sort((a, b) => (a.y + a.frameHeight) - (b.y + b.frameHeight));
 
@@ -570,6 +593,161 @@ export default class Game {
         this.ctx.fillText("YOU DIED", this.width / 2, this.height / 2 - 40);
         this.ctx.font = "30px Arial";
         this.ctx.fillText(`Survived ${this.elapsedTime}s - Press R to Restart`, this.width / 2, this.height / 2 + 40);
+    }
+
+    handleClick(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+
+        const bw = 300, bh = 60;
+        const bx = (this.width - bw) / 2;
+        const startY = this.height / 2;
+        const howToPlayY = startY + 90;
+        const creditsY = howToPlayY + 90;
+
+        if (this.screen === 'title') {
+            // Start Button
+            if (x >= bx && x <= bx + bw && y >= startY && y <= startY + bh) {
+                this.startGame();
+                return;
+            }
+            // Controls Button
+            if (x >= bx && x <= bx + bw && y >= howToPlayY && y <= howToPlayY + bh) {
+                this.screen = 'controls';
+                return;
+            }
+            // Credits Button
+            if (x >= bx && x <= bx + bw && y >= creditsY && y <= creditsY + bh) {
+                this.screen = 'credits';
+                return;
+            }
+        } else if (this.screen === 'controls') {
+            // Back button at bottom
+            const backY = this.height - 120;
+            if (x >= bx && x <= bx + bw && y >= backY && y <= backY + bh) {
+                this.screen = 'title';
+                return;
+            }
+        } else if (this.screen === 'credits') {
+            const backY = this.height - 120;
+            if (x >= bx && x <= bx + bw && y >= backY && y <= backY + bh) {
+                this.screen = 'title';
+                return;
+            }
+        }
+    }
+
+    startGame() {
+        this.screen = 'playing';
+        // reset timers so the wave/timer logic starts fresh
+        this.lastSecondTime = 0;
+        this.lastTime = 0;
+        this.elapsedTime = 0;
+        this.waveStartTime = 0;
+    }
+
+    drawTitleScreen(timestamp) {
+        // Dim background
+        this.ctx.fillStyle = 'black';
+        this.ctx.fillRect(0, 0, this.width, this.height);
+
+        // Title
+        this.ctx.fillStyle = 'red';
+        this.ctx.textAlign = 'center';
+        this.ctx.font = '72px Arial';
+        this.ctx.fillText('Nightfall Survivors', this.width / 2, this.height / 2 - 120);
+
+        // Buttons
+        const bw = 300, bh = 60;
+        const bx = (this.width - bw) / 2;
+        const startY = this.height / 2;
+        const howToPlayY = startY + 90;
+        const creditsY = howToPlayY + 90;
+
+        // Start Button
+        this.ctx.fillStyle = '#007acc';
+        this.ctx.fillRect(bx, startY, bw, bh);
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = '28px Arial';
+        this.ctx.fillText('Start Game', this.width / 2, startY + 40);
+
+        // Controls Button
+        this.ctx.fillStyle = '#444';
+        this.ctx.fillRect(bx, howToPlayY, bw, bh);
+        this.ctx.fillStyle = 'white';
+        this.ctx.fillText('How to Play', this.width / 2, howToPlayY + 40);
+
+        // Credits Button
+        this.ctx.fillStyle = '#444';
+        this.ctx.fillRect(bx, creditsY, bw, bh);
+        this.ctx.fillStyle = 'white';
+        this.ctx.fillText('Credits', this.width / 2, creditsY + 40);
+
+        // Small hint
+        this.ctx.font = '16px Arial';
+        this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        this.ctx.fillText('Click a button to begin', this.width / 2, creditsY + 110);
+    }
+
+    drawControlsScreen() {
+        this.ctx.fillStyle = 'black';
+        this.ctx.fillRect(0, 0, this.width, this.height);
+
+        this.ctx.fillStyle = 'white';
+        this.ctx.textAlign = 'center';
+        this.ctx.font = '48px Arial';
+        this.ctx.fillText('Controls', this.width / 2, 80);
+
+        this.ctx.font = '20px Arial';
+        this.ctx.textAlign = 'left';
+        const left = 80;
+        let y = 140;
+        const lineH = 30;
+        this.ctx.fillText('- Move: W A S D or Arrow Keys', left, y); y += lineH;
+        this.ctx.fillText('- Sprint: Hold Shift', left, y); y += lineH;
+        this.ctx.fillText('- Auto-attack: Projectiles fire periodically', left, y); y += lineH;
+        this.ctx.fillText('- Objective: Survive as long as possible', left, y); y += lineH;
+        this.ctx.fillText('  Kill enemies to collect XP orbs to level up, get stronger, and eventually beat the boss.', left, y); y += lineH * 2;
+
+        // Back button
+        const bw = 300, bh = 60;
+        const bx = (this.width - bw) / 2;
+        const backY = this.height - 120;
+        this.ctx.fillStyle = '#007acc';
+        this.ctx.fillRect(bx, backY, bw, bh);
+        this.ctx.fillStyle = 'white';
+        this.ctx.textAlign = 'center';
+        this.ctx.font = '26px Arial';
+        this.ctx.fillText('Back', this.width / 2, backY + 40);
+    }
+
+    drawCreditsScreen() {
+        this.ctx.fillStyle = 'black';
+        this.ctx.fillRect(0, 0, this.width, this.height);
+
+        this.ctx.fillStyle = 'white';
+        this.ctx.textAlign = 'center';
+        this.ctx.font = '48px Arial';
+        this.ctx.fillText('Credits', this.width / 2, 80);
+
+        this.ctx.font = '22px Arial';
+        this.ctx.textAlign = 'center';
+        const names = 'Created by Carson Poirier, Ibrahim Elnikety, Thien-An Tran, and Geroge Njane.';
+        this.ctx.fillText(names, this.width / 2, this.height / 2);
+
+        // Back button
+        const bw = 300, bh = 60;
+        const bx = (this.width - bw) / 2;
+        const backY = this.height - 120;
+        this.ctx.fillStyle = '#007acc';
+        this.ctx.fillRect(bx, backY, bw, bh);
+        this.ctx.fillStyle = 'white';
+        this.ctx.textAlign = 'center';
+        this.ctx.font = '26px Arial';
+        this.ctx.fillText('Back', this.width / 2, backY + 40);
     }
 
     animate(timestamp) {
