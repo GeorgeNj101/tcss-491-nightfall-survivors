@@ -4,6 +4,7 @@ import XpOrb from "./XpOrb.js";
 import Projectile from "./Projectile.js";
 import Boss from "./Boss.js";
 import Camera from "./Camera.js";
+import LevelUp from "./LevelUp.js";
 
 export default class Game {
     constructor(canvas) {
@@ -22,6 +23,9 @@ export default class Game {
         this.lastSecondTime = 0;
         this.lastTime = 0;
         this.score = 0;
+        this.gamePaused = false; // For level up menu
+        this.pauseStartTime = 0; // Track when pause started
+        this.totalPauseTime = 0; // Track total time paused
 
         //FOR CHEATS/DEBUGGING
         this.cheatLocked = false;
@@ -58,6 +62,9 @@ export default class Game {
         this.grassImage = new Image();
         this.grassImage.src = "assets/Grass.png";
 
+        // --- Level Up System ---
+        this.levelUpSystem = new LevelUp(this.stats, this);
+
         this.init();
     }
 
@@ -65,6 +72,12 @@ export default class Game {
         window.addEventListener("keydown", e => {
             this.keys[e.key] = true;
             if (this.isDead && e.key.toLowerCase() === 'r') location.reload();
+
+            // Handle SPACE key to close level up menu
+            if (e.key === " " && this.levelUpSystem && this.levelUpSystem.isLevelingUp) {
+                this.levelUpSystem.closeLevelUpMenu();
+                e.preventDefault(); // Prevent page scroll
+            }
         });
         window.addEventListener("keyup", e => this.keys[e.key] = false);
         
@@ -76,16 +89,19 @@ export default class Game {
     update(timestamp) {
         if (this.isDead) return;
 
-        this.gameFrame++;
-        this.updateTimers(timestamp);
-        this.handleWaveSystem(timestamp);
-        this.handleMovement();
-        this.handleCombat();
-        this.handleXpCollection();
-        
-        if (this.stats.hp <= 0) {
-            this.isDead = true;
-            this.stats.hp = 0;
+        // Don't update game logic if paused (level up menu)
+        if (!this.gamePaused) {
+            this.gameFrame++;
+            this.updateTimers(timestamp);
+            this.handleWaveSystem(timestamp);
+            this.handleMovement();
+            this.handleCombat();
+            this.handleXpCollection();
+
+            if (this.stats.hp <= 0) {
+                this.isDead = true;
+                this.stats.hp = 0;
+            }
         }
     }
 
@@ -424,8 +440,7 @@ export default class Game {
             if (this.player.collidesWith(orb)) {
                 orb.markedForDeletion = true;
                 console.log("DEBUG: Orb Collected!");
-                this.stats.xp++;
-                if (this.stats.xp >= this.stats.maxXp) this.levelUp();
+                this.levelUpSystem.addXP(1); // Use LevelUp system
             }
         });
         this.xpOrbs = this.xpOrbs.filter(o => !o.markedForDeletion);
@@ -492,7 +507,11 @@ export default class Game {
 
         this.drawUI(timestamp);
         if (this.isDead) this.drawDeathScreen();
-        
+
+        // Draw level up menu if active
+        if (this.levelUpSystem.isLevelingUp) {
+            this.levelUpSystem.drawLevelUpMenu(this.ctx, this.width, this.height);
+        }
     }
 
     drawBackground() {
@@ -524,7 +543,9 @@ export default class Game {
         const ctx = this.ctx;
         // Bars
         this.drawBar(20, 20, 200, 20, this.stats.hp / this.stats.maxHp, "red", `${Math.floor(this.stats.hp)}/${this.stats.maxHp}`);
-        this.drawBar(20, 50, 200, 20, this.stats.xp / this.stats.maxXp, "blue", `${this.stats.xp}/${this.stats.maxXp}`);
+
+        // Use LevelUp system for XP bar
+        this.levelUpSystem.drawXPBar(ctx, 20, 50, 200, 20);
         
         // Wave Info
         const waveElapsed = (timestamp - this.waveStartTime) / 1000;
@@ -535,11 +556,11 @@ export default class Game {
 
         ctx.fillStyle = "white";
         ctx.font = "24px Arial";
-        
+
         ctx.textAlign = "left";
         ctx.fillText(`Time: ${Math.floor(this.elapsedTime / 60)}:${(this.elapsedTime % 60).toString().padStart(2, '0')}`, 240, 40);
         ctx.textAlign = "left";
-        ctx.fillText(`level: ${this.stats.level}`, 240, 70);
+        ctx.fillText(`Level: ${this.stats.level}`, 240, 70);
         
         
         ctx.textAlign = "right";
@@ -579,11 +600,11 @@ export default class Game {
     const deltaTime = timestamp - this.lastTime;
     this.lastTime = timestamp;
 
-    this.update(deltaTime); 
-    
+    this.update(timestamp); // Pass timestamp, not deltaTime
+
     // --- FIX: Pass timestamp to draw() so the UI timer works ---
-    this.draw(timestamp); 
-    
+    this.draw(timestamp);
+
     requestAnimationFrame(this.animate);
     }
 }

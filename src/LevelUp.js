@@ -1,6 +1,7 @@
-class LevelUp {
-    constructor(player) {
+export default class LevelUp {
+    constructor(player, game) {
         this.player = player;
+        this.game = game; // Reference to the game instance
         
         // Initialize player level and XP
         this.player.level = 1;
@@ -66,9 +67,10 @@ class LevelUp {
     triggerLevelUpMenu() {
         this.isLevelingUp = true;
 
-        // Pause the game (will be set in game.js)
-        if (typeof gamePaused !== 'undefined') {
-            gamePaused = true;
+        // Pause the game and track pause start time
+        if (this.game) {
+            this.game.gamePaused = true;
+            this.game.pauseStartTime = performance.now();
         }
 
         console.log("Level up menu triggered! Press SPACE to skip upgrade.");
@@ -107,9 +109,12 @@ class LevelUp {
         this.isLevelingUp = false;
         this.pendingLevelUps = 0; // Clear all pending level ups
 
-        // Resume the game (will be set in game.js)
-        if (typeof gamePaused !== 'undefined') {
-            gamePaused = false;
+        // Resume the game and track pause duration
+        if (this.game) {
+            const pauseDuration = performance.now() - this.game.pauseStartTime;
+            this.game.totalPauseTime += pauseDuration;
+            this.game.waveStartTime += pauseDuration; // Adjust wave timer
+            this.game.gamePaused = false;
         }
 
         console.log("Level up menu closed. Game resumed.");
