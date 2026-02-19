@@ -5,6 +5,7 @@ import Projectile from "./Projectile.js";
 import Boss from "./Boss.js";
 import Camera from "./Camera.js";
 import LevelUp from "./LevelUp.js";
+import Inventory from "./Inventory.js";
 
 export default class Game {
     constructor(canvas) {
@@ -61,6 +62,9 @@ export default class Game {
         this.tileSize = 64;
         this.grassImage = new Image();
         this.grassImage.src = "assets/Grass.png";
+
+        // --- Inventory ---
+        this.inventory = new Inventory(this);
 
         // --- Level Up System ---
         this.levelUpSystem = new LevelUp(this.stats, this);
@@ -506,6 +510,7 @@ export default class Game {
         });
 
         this.drawUI(timestamp);
+        this.inventory.drawInventory();
         if (this.isDead) this.drawDeathScreen();
 
         // Draw level up menu if active
