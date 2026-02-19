@@ -66,8 +66,15 @@ export default class Game {
         // --- Inventory ---
         this.inventory = new Inventory(this);
 
+        // --- Weapon ---
+        this.currentWeapon = null;
+        this.lastShotTime = 0; // timestamp of last weapon shot
+
         // --- Level Up System ---
         this.levelUpSystem = new LevelUp(this.stats, this);
+
+        // --- Mouse tracking ---
+        this.mouse = { x: 0, y: 0, down: false };
 
         this.init();
     }
@@ -84,8 +91,28 @@ export default class Game {
             }
         });
         window.addEventListener("keyup", e => this.keys[e.key] = false);
-        
-        
+
+        // Mouse tracking — use window-level events so it works while keys are held
+        window.addEventListener("mousemove", e => {
+            const rect = this.canvas.getBoundingClientRect();
+            this.mouse.x = e.clientX - rect.left;
+            this.mouse.y = e.clientY - rect.top;
+        });
+        window.addEventListener("mousedown", e => {
+            if (e.button === 0) this.mouse.down = true;
+        });
+        window.addEventListener("mouseup", e => {
+            if (e.button === 0) this.mouse.down = false;
+        });
+        this.canvas.addEventListener("click", e => {
+            if (this.levelUpSystem && this.levelUpSystem.isLevelingUp) {
+                const rect = this.canvas.getBoundingClientRect();
+                this.levelUpSystem.handleClick(e.clientX - rect.left, e.clientY - rect.top);
+            }
+        });
+        // Prevent right-click context menu on canvas
+        this.canvas.addEventListener("contextmenu", e => e.preventDefault());
+
         this.animate = this.animate.bind(this);
         requestAnimationFrame(this.animate);
     }
@@ -206,232 +233,92 @@ export default class Game {
         // this.camera.update(this.player);
     }
     handleCombat() {
-         if (this.stats.attackTimer >= this.stats.attackCooldown) {
-        
-            // Center the spawn point on the player
-            const spawnX = this.player.x + this.player.frameWidth / 2 - 16; 
-            const spawnY = this.player.y + this.player.frameHeight / 2 - 16;
+        const spawnX = this.player.x + this.player.frameWidth / 2 - 16;
+        const spawnY = this.player.y + this.player.frameHeight / 2 - 16;
 
-            // Define the 4 diagonal directions
-            const directions = [
-                { x: 1,  y: -1 }, // NE (Right-Up)
-                { x: 1,  y: 1 },  // SE (Right-Down)
-                { x: -1, y: 1 },  // SW (Left-Down)
-                { x: -1, y: -1 }  // NW (Left-Up)
-            ];
+        // --- WEAPON SHOOTING (mouse-aimed) ---
+        if (this.currentWeapon && this.mouse.down) {
+            const stats = this.currentWeapon.stats || {};
+            const fireRate = stats.fireRate || 3; // shots per second
+            const cooldownMs = 1000 / fireRate;
+            const now = performance.now();
 
-            directions.forEach(dir => {
-                // Normalize the vector so diagonal speed isn't faster
-                // Math.hypot(1, 1) is approx 1.414
-                const length = Math.hypot(dir.x, dir.y); 
-                const dx = dir.x / length;
-                const dy = dir.y / length;
+            if (now - this.lastShotTime >= cooldownMs) {
+                this.lastShotTime = now;
 
-                this.projectiles.push(new Projectile(spawnX, spawnY, dx, dy));
-            });
+                // Convert screen mouse → world position
+                const worldMX = this.mouse.x + this.camera.x;
+                const worldMY = this.mouse.y + this.camera.y;
 
-            this.stats.attackTimer = 0;
-    }
-    // 1. Check Projectiles vs Enemies
-    // Iterate backwards through projectiles so we can remove them safely
-    for (let i = this.projectiles.length - 1; i >= 0; i--) {
-        const p = this.projectiles[i];
-        p.update();
+                // Direction from player center to mouse world pos
+                const dx = worldMX - (this.player.x + this.player.frameWidth / 2);
+                const dy = worldMY - (this.player.y + this.player.frameHeight / 2);
+                const len = Math.hypot(dx, dy) || 1;
 
-        // Check this single projectile against ALL enemies
-        for (let j = this.enemies.length - 1; j >= 0; j--) {
-            const enemy = this.enemies[j];
-
-            // THE COLLISION CHECK
-            if (p.collidesWith(enemy)) {
-                console.log("Hit registered!"); // Debug log
-                
-                // If enemy has HP (boss), reduce HP; otherwise kill instantly
-                if (typeof enemy.hp === 'number') {
-                    // Damage amount for a single projectile
-                    const dmg = 50;
-                    enemy.hp -= dmg;
-                    console.log(`Boss hit! HP: ${enemy.hp}`);
-                    p.markedForDeletion = true;
-                    if (enemy.hp <= 0) {
-                        enemy.markedForDeletion = true;
-                        // Spawn multiple XP orbs for boss
-                        for (let k = 0; k < 8; k++) {
-                            this.xpOrbs.push(new XpOrb(enemy.x + (Math.random()-0.5)*40, enemy.y + (Math.random()-0.5)*40));
-                        }
-                        this.score += 250;
-                    }
-                } else {
-                    // Kill Enemy
-                    enemy.markedForDeletion = true;
-                    // Destroy Projectile
-                    p.markedForDeletion = true;
-
-                    // Spawn XP Orb at Enemy position
-                    this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
-                    this.score += 10;
-                }
-
-                // Break loop: This bullet can't kill 2 enemies at once
-                
+                this.projectiles.push(new Projectile(spawnX, spawnY, dx / len, dy / len));
             }
         }
-    }
 
-    // 2. Check Enemies vs Player
-    this.enemies.forEach(enemy => {
-        enemy.update(this.player.x, this.player.y, this);
-        
-        if (this.player.collidesWith(enemy)) {
-                // If this is a boss (has hp), don't auto-kill it on touch; just damage player
-                if (typeof enemy.hp === 'number') {
-                    if (this.stats.hp > 0) this.stats.hp -= .05;
-                } else {
-                    // Optional: Cooldown to prevent instant death
-                    if (this.stats.hp > 0) {
-                         this.stats.hp -= 20;
-                    }
-                    enemy.markedForDeletion = true;
-                }
-        }
-    });
-
-    // 3. Filter out dead objects
-    this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
-    this.enemies = this.enemies.filter(e => !e.markedForDeletion);
-}
-    handleCombat1() {
-        //  Auto-Fire Projectiles
-        // if (this.stats.attackTimer >= this.stats.attackCooldown) {
-        //     const target = this.getNearestEnemy();
-        //     if (target) {
-        //         this.projectiles.push(new Projectile(this.player.x, this.player.y, target));
-        //         this.stats.attackTimer = 0;
-        //     }
-        // }
-        //
+        // --- DEFAULT AUTO-FIRE (diagonal fireballs, always active) ---
         if (this.stats.attackTimer >= this.stats.attackCooldown) {
-        
-            // Center the spawn point on the player
-            const spawnX = this.player.x + this.player.frameWidth / 2 - 16; 
-            const spawnY = this.player.y + this.player.frameHeight / 2 - 16;
-
-            // Define the 4 diagonal directions
             const directions = [
-                { x: 1,  y: -1 }, // NE (Right-Up)
-                { x: 1,  y: 1 },  // SE (Right-Down)
-                { x: -1, y: 1 },  // SW (Left-Down)
-                { x: -1, y: -1 }  // NW (Left-Up)
+                { x: 1, y: -1 }, { x: 1, y: 1 },
+                { x: -1, y: 1 }, { x: -1, y: -1 }
             ];
-
             directions.forEach(dir => {
-                // Normalize the vector so diagonal speed isn't faster
-                // Math.hypot(1, 1) is approx 1.414
-                const length = Math.hypot(dir.x, dir.y); 
-                const dx = dir.x / length;
-                const dy = dir.y / length;
-
-                this.projectiles.push(new Projectile(spawnX, spawnY, dx, dy));
+                const len = Math.hypot(dir.x, dir.y);
+                this.projectiles.push(new Projectile(spawnX, spawnY, dir.x / len, dir.y / len));
             });
-
             this.stats.attackTimer = 0;
-    }
-    this.projectiles.forEach(projectile => {
-        projectile.update();
-        for(let i = 0; i < this.enemies.length; i++) {
-            const enemy = this.enemies[i];
-            if (projectile.collidesWith(enemy)) {
-                console.log(`DEBUG: Hit! Enemy at ${Math.floor(enemy.x)},${Math.floor(enemy.y)}`);
-                // If boss (has hp), apply damage
-                if (typeof enemy.hp === 'number') {
-                    const dmg = 50;
-                    enemy.hp -= dmg;
-                    projectile.markedForDeletion = true;
-                    if (enemy.hp <= 0) {
-                        enemy.markedForDeletion = true;
-                        for (let k = 0; k < 8; k++) {
-                            this.xpOrbs.push(new XpOrb(enemy.x + (Math.random()-0.5)*40, enemy.y + (Math.random()-0.5)*40));
+        }
+
+        // 1. Update projectiles & check collisions with enemies
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const p = this.projectiles[i];
+            p.update();
+
+            for (let j = this.enemies.length - 1; j >= 0; j--) {
+                const enemy = this.enemies[j];
+                if (p.collidesWith(enemy)) {
+                    if (typeof enemy.hp === 'number') {
+                        const dmg = 50;
+                        enemy.hp -= dmg;
+                        p.markedForDeletion = true;
+                        if (enemy.hp <= 0) {
+                            enemy.markedForDeletion = true;
+                            for (let k = 0; k < 8; k++) {
+                                this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                            }
+                            this.score += 250;
                         }
-                        this.score += 250;
+                    } else {
+                        enemy.markedForDeletion = true;
+                        p.markedForDeletion = true;
+                        this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
+                        this.score += 10;
                     }
-                } else {
-                    enemy.markedForDeletion = true;
-                    projectile.markedForDeletion = true;
-                    this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
-                    this.score += 10;
+                    break;
                 }
-
-                break; // Bullet hit something, stop checking other enemies for this bullet
             }
-        }   
-    });
+        }
 
-
-        // this.projectiles.forEach(p => {
-        //     p.update();
-            
-        //     // Check collision with its target
-        //     if (p.target && !p.target.markedForDeletion) {
-        //         const dist = p.getDistance(p.target);
-        //         if (dist < 30) { // Hit!
-        //             console.log("DEBUG: Projectile Hit! Enemy Defeated."); // --- DEBUG LOG ---
-        //             p.markedForDeletion = true;
-        //             p.target.markedForDeletion = true;
-                    
-        //             // DROP XP ORB HERE
-        //             console.log(`DEBUG: Spawning XP Orb at ${p.target.x}, ${p.target.y}`); // --- DEBUG LOG ---
-        //             this.xpOrbs.push(new XpOrb(p.target.x, p.target.y));
-                    
-        //             this.score += 10;
-        //         }
-        //     }
-        // });
-        // this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
-        // this.projectiles.forEach(projectile => {
-        // projectile.update();
-            
-        //     // Check this projectile against ALL enemies
-        //     // (We iterate backwards so we can safely remove enemies from the array)
-        //     for (let i = this.enemies.length - 1; i >= 0; i--) {
-        //         const enemy = this.enemies[i];
-                
-        //         // CLEAN SYNTAX HERE:
-        //         if (projectile.collidesWith(enemy)) {
-        //             console.log(`DEBUG: Hit! Enemy at ${Math.floor(enemy.x)},${Math.floor(enemy.y)}`);
-        //             // Logic
-        //             enemy.markedForDeletion = true;
-        //             projectile.markedForDeletion = true;
-        //             this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
-        //             this.score += 10;
-        //             console.log(`DEBUG: XP Orb spawned. Total Orbs: ${this.xpOrbs.length}`);
-                    
-        //             break; // Bullet hit something, stop checking other enemies for this bullet
-        //         }
-        //     }
-        // });
-
-        // 3. Enemy Logic (Movement + Player Collision)
+        // 2. Enemy movement + player collision
         this.enemies.forEach(enemy => {
             enemy.update(this.player.x, this.player.y, this);
-            // const dist = enemy.getDistance(this.player);
-
             if (this.player.collidesWith(enemy)) {
                 if (typeof enemy.hp === 'number') {
-                    // Boss collision: damage player only
-                    this.stats.hp -= 5;
-                    console.log(`DEBUG: Player Hit by Boss! HP: ${this.stats.hp}`);
+                    if (this.stats.hp > 0) this.stats.hp -= 0.05;
                 } else {
-                    // Non-boss: kill enemy and damage player
+                    if (this.stats.hp > 0) this.stats.hp -= 20;
                     enemy.markedForDeletion = true;
-                    this.stats.hp -=10;
-                    console.log(`DEBUG: Player Hit! HP: ${this.stats.hp}`);// --- DEBUG LOG ---
                 }
             }
         });
+
+        // 3. Filter out dead objects
         this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
         this.enemies = this.enemies.filter(e => !e.markedForDeletion);
     }
-
     handleXpCollection() {
         this.xpOrbs.forEach(orb => {
             const dist = orb.getDistance(this.player);
@@ -450,22 +337,22 @@ export default class Game {
         this.xpOrbs = this.xpOrbs.filter(o => !o.markedForDeletion);
     }
 
-    levelUp() {
-        this.stats.level++;
-        this.stats.xp = 0;
-        this.stats.maxXp = Math.floor(this.stats.maxXp * 1.5);
-        this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + 20);
-        this.stats.maxHp += 10;
-        console.log("DEBUG: Level Up! Level " + this.stats.level);
-        if (this.stats.level % 5 === 0) {
-            this.stats.speed = Math.min(10, this.stats.speed + 1);
-            console.log("DEBUG: Speed Increased! Speed: " + this.stats.speed);
-        }
-        if (this.stats.level % 3 === 0 ){
-            this.stats.attackCooldown = Math.max(30, this.stats.attackCooldown - 20);
-            console.log("DEBUG: Attack Speed Increased! Cooldown: " + this.stats.attackCooldown);
-        }
-    }
+    // levelUp() {
+    //     this.stats.level++;
+    //     this.stats.xp = 0;
+    //     this.stats.maxXp = Math.floor(this.stats.maxXp * 1.5);
+    //     this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + 20);
+    //     this.stats.maxHp += 10;
+    //     console.log("DEBUG: Level Up! Level " + this.stats.level);
+    //     if (this.stats.level % 5 === 0) {
+    //         this.stats.speed = Math.min(10, this.stats.speed + 1);
+    //         console.log("DEBUG: Speed Increased! Speed: " + this.stats.speed);
+    //     }
+    //     if (this.stats.level % 3 === 0 ){
+    //         this.stats.attackCooldown = Math.max(30, this.stats.attackCooldown - 20);
+    //         console.log("DEBUG: Attack Speed Increased! Cooldown: " + this.stats.attackCooldown);
+    //     }
+    // }
 
     getNearestEnemy() {
         return this.enemies.reduce((nearest, current) => {
@@ -511,6 +398,12 @@ export default class Game {
 
         this.drawUI(timestamp);
         this.inventory.drawInventory();
+
+        // Draw crosshair when weapon equipped
+        if (this.currentWeapon && !this.isDead && !this.levelUpSystem.isLevelingUp) {
+            this.drawCrosshair();
+        }
+
         if (this.isDead) this.drawDeathScreen();
 
         // Draw level up menu if active
@@ -585,6 +478,47 @@ export default class Game {
         this.ctx.font = "14px Arial";
         this.ctx.textAlign = "center";
         this.ctx.fillText(label, x + w / 2, y + h - 5);
+    }
+
+    drawCrosshair() {
+        const ctx = this.ctx;
+        const mx = this.mouse.x;
+        const my = this.mouse.y;
+        const size = 12;
+        const gap = 4;
+
+        ctx.save();
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 2;
+
+        // Top line
+        ctx.beginPath();
+        ctx.moveTo(mx, my - gap);
+        ctx.lineTo(mx, my - gap - size);
+        ctx.stroke();
+        // Bottom line
+        ctx.beginPath();
+        ctx.moveTo(mx, my + gap);
+        ctx.lineTo(mx, my + gap + size);
+        ctx.stroke();
+        // Left line
+        ctx.beginPath();
+        ctx.moveTo(mx - gap, my);
+        ctx.lineTo(mx - gap - size, my);
+        ctx.stroke();
+        // Right line
+        ctx.beginPath();
+        ctx.moveTo(mx + gap, my);
+        ctx.lineTo(mx + gap + size, my);
+        ctx.stroke();
+
+        // Center dot
+        ctx.fillStyle = "red";
+        ctx.beginPath();
+        ctx.arc(mx, my, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
     }
 
     drawDeathScreen() {

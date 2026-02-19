@@ -1,14 +1,13 @@
-const inventory = [];
-
 export default class Inventory {
     constructor(game) {
 			this.game = game;
       this.inventory = [];
+			this.maxSlots = 5;
 			this.selectedIndex = -1; // No selection at start
     }
 
-    addItem(item) {
-        this.inventory.push(item);
+    addItem(itemObject) {
+        this.inventory.push(itemObject);
     }
 
     removeItem(item) {
@@ -19,9 +18,25 @@ export default class Inventory {
     }
 
     useItem(item) {
-
-        // Logic to use the item 
+			if (typeof item.effect === 'function') {
+				item.effect(this.game);
+			}
+			this.removeItem(item);
     }
+
+		selectItem(index) {
+			this.selectedIndex = index;
+		  const selectedItem = this.inventory[index];
+			if (!selectedItem) return;
+
+			if (selectedItem.type === "weapon") {
+				this.game.currentWeapon = selectedItem;
+				
+			} else {
+				this.useItem(selectedItem);
+			}
+		}
+
 		drawInventory() {
 			const ctx = this.game.ctx;
 			const canvas = this.game.canvas;
@@ -29,9 +44,8 @@ export default class Inventory {
 			const margin = 20;
 			const slotSize = 50;
 			const spacing = 10;
-			const slotsPerRow = 5;
 	
-			const totalWidth = slotsPerRow * slotSize + (slotsPerRow - 1) * spacing;
+			const totalWidth = this.maxSlots * slotSize + (this.maxSlots - 1) * spacing;
 			const totalHeight = slotSize;
 	
 			// Bottom-left anchored position
@@ -48,7 +62,7 @@ export default class Inventory {
 			);
 	
 			// --- Draw slots ---
-			for (let i = 0; i < slotsPerRow; i++) {
+			for (let i = 0; i < this.maxSlots; i++) {
 					const x = startX + i * (slotSize + spacing);
 					const y = startY;
 	
@@ -60,14 +74,23 @@ export default class Inventory {
 	
 					// Draw item if exists
 					const item = this.inventory[i];
-					if (item && item.sprite) {
+					if (item && item.image && item.image.complete) {
 							ctx.drawImage(
-									item.sprite,
+									item.image,
 									x + 5,
 									y + 5,
 									slotSize - 10,
 									slotSize - 10
 							);
+					}
+
+					// Type indicator border color
+					if (item) {
+							ctx.strokeStyle = item.type === "weapon" ? "rgba(255, 100, 100, 0.8)"
+							                : item.type === "consumable" ? "rgba(100, 255, 100, 0.8)"
+							                : "rgba(255, 255, 255, 0.3)";
+							ctx.lineWidth = 2;
+							ctx.strokeRect(x, y, slotSize, slotSize);
 					}
 			}
 	}

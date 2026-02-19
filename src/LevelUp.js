@@ -1,3 +1,4 @@
+import ItemObject from "./ItemObject.js";
 export default class LevelUp {
     constructor(player, game) {
         this.player = player;
@@ -6,15 +7,59 @@ export default class LevelUp {
         // Initialize player level and XP
         this.player.level = 1;
         this.player.xp = 0;
-        this.player.maxXP = 10;
+        this.player.maxXP = 3;
         
         // Level up state
         this.isLevelingUp = false;
         this.pendingLevelUps = 0; // Track multiple level ups at once
         
         // Upgrade options (will be populated in Step 3)
-        this.availableUpgrades = [];
+        this.availableUpgrades = [
+            // Pistol weapon
+            new ItemObject(
+                this.loadImage("assets/pistol.png"),
+                "weapon",
+                "Pistol",
+                "Basic pistol. Medium damage, medium fire rate.",
+                (game) => {
+                    // When acquired, set as current weapon and add to inventory
+                    const pistolItem = game.inventory.inventory.find(i => i.name === "Pistol");
+                    if (pistolItem) {
+                        game.currentWeapon = pistolItem;
+                    }
+                },
+                {
+                    damage: 10,
+                    fireRate: 3,          // shots per second
+                    projectileSpeed: 600, // px/sec
+                    range: 500,           // px
+                    spread: 0,            // degrees
+                    projectileSprite: "assets/Fireball.png" // or a bullet sprite
+                }
+            ),
+            // Xp Orb
+            new ItemObject(
+                this.loadImage("assets/Xp_Orb.png"),
+                "passive",
+                "Sprint",
+                "+1 Speed",
+                (game) => {
+                    game.stats.speed += 1;
+                }
+            ),
+
+        ];
+        
+
         this.selectedUpgrades = []; // Player's inventory
+        this.currentChoices = [];    // Upgrades offered this level up
+
+        // Card layout constants
+        this.cardWidth = 200;
+        this.cardHeight = 270;
+        this.cardSpacing = 30;
+        this.cardY = 300; // top of cards
+        this.hoveredIndex = -1; // which card is hovered
     }
     
     /**
@@ -62,10 +107,27 @@ export default class LevelUp {
     }
     
     /**
-     * Trigger the level up menu (Step 2)
+     * Generate random upgrade choices from the pool
+     */
+    generateChoices() {
+        // Shuffle and pick up to 3 (or all if fewer than 3)
+        const pool = [...this.availableUpgrades];
+        const count = Math.min(3, pool.length);
+        const choices = [];
+        for (let i = 0; i < count; i++) {
+            const idx = Math.floor(Math.random() * pool.length);
+            choices.push(pool.splice(idx, 1)[0]);
+        }
+        return choices;
+    }
+
+    /**
+     * Trigger the level up menu
      */
     triggerLevelUpMenu() {
         this.isLevelingUp = true;
+        this.currentChoices = this.generateChoices();
+        this.hoveredIndex = -1;
 
         // Pause the game and track pause start time
         if (this.game) {
@@ -73,7 +135,7 @@ export default class LevelUp {
             this.game.pauseStartTime = performance.now();
         }
 
-        console.log("Level up menu triggered! Press SPACE to skip upgrade.");
+        console.log("Level up menu triggered! Choose an upgrade or press SPACE to skip.");
     }
     
     /**
@@ -98,8 +160,29 @@ export default class LevelUp {
      * @param {object} upgrade - The upgrade to apply
      */
     applyUpgrade(upgrade) {
-        // TODO: Implement upgrade effects (Step 5)
-        console.log(`Applied upgrade: ${upgrade.name}`);
+        // Run the upgrade's effect (stat changes, etc.)
+        if (typeof upgrade.effect === 'function') {
+            upgrade.effect(this.game);
+        }
+
+        // Add to inventory (weapons persist, consumables also show)
+        this.game.inventory.addItem(upgrade);
+
+        // If it's a weapon and we don't have a current weapon, equip it
+        if (upgrade.type === "weapon" && !this.game.currentWeapon) {
+            this.game.currentWeapon = upgrade;
+        }
+
+        console.log(`Applied upgrade: ${upgrade.name} (${upgrade.type})`);
+    }
+
+    /**
+     * Helper to properly load an image
+     */
+    loadImage(src) {
+        const img = new Image();
+        img.src = src;
+        return img;
     }
     
     /**
@@ -107,13 +190,12 @@ export default class LevelUp {
      */
     closeLevelUpMenu() {
         this.isLevelingUp = false;
-        this.pendingLevelUps = 0; // Clear all pending level ups
+        this.pendingLevelUps = 0;
 
-        // Resume the game and track pause duration
         if (this.game) {
             const pauseDuration = performance.now() - this.game.pauseStartTime;
             this.game.totalPauseTime += pauseDuration;
-            this.game.waveStartTime += pauseDuration; // Adjust wave timer
+            this.game.waveStartTime += pauseDuration;
             this.game.gamePaused = false;
         }
 
@@ -160,7 +242,47 @@ export default class LevelUp {
      * @param {number} canvasWidth - Canvas width
      * @param {number} canvasHeight - Canvas height
      */
+    /**
+     * Get the bounding rect for a card at a given index
+     */
+    getCardRect(index, canvasWidth) {
+        const totalCards = this.currentChoices.length;
+        const totalWidth = totalCards * this.cardWidth + (totalCards - 1) * this.cardSpacing;
+        const startX = (canvasWidth - totalWidth) / 2;
+        const x = startX + index * (this.cardWidth + this.cardSpacing);
+        return { x, y: this.cardY, w: this.cardWidth, h: this.cardHeight };
+    }
+
+    /**
+     * Handle mouse click on upgrade cards
+     */
+    handleClick(mx, my) {
+        if (!this.isLevelingUp) return;
+        const canvasWidth = this.game.canvas.width;
+        for (let i = 0; i < this.currentChoices.length; i++) {
+            const r = this.getCardRect(i, canvasWidth);
+            if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
+                this.selectUpgrade(this.currentChoices[i]);
+                return;
+            }
+        }
+    }
+
     drawLevelUpMenu(ctx, canvasWidth, canvasHeight) {
+        // Update hover state from mouse position
+        this.hoveredIndex = -1;
+        if (this.game.mouse) {
+            const mx = this.game.mouse.x;
+            const my = this.game.mouse.y;
+            for (let i = 0; i < this.currentChoices.length; i++) {
+                const r = this.getCardRect(i, canvasWidth);
+                if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
+                    this.hoveredIndex = i;
+                    break;
+                }
+            }
+        }
+
         // Darker semi-transparent overlay
         ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -172,8 +294,6 @@ export default class LevelUp {
         ctx.font = "bold 72px Arial";
         ctx.textAlign = "center";
         ctx.fillText("LEVEL UP!", canvasWidth / 2, 150);
-
-        // Reset shadow
         ctx.shadowBlur = 0;
 
         // Level info
@@ -188,27 +308,84 @@ export default class LevelUp {
             ctx.fillText(`(${this.pendingLevelUps} level ups pending)`, canvasWidth / 2, 270);
         }
 
-        // Placeholder for upgrade options (Step 3)
-        ctx.fillStyle = "white";
-        ctx.font = "28px Arial";
-        ctx.fillText("Choose an upgrade:", canvasWidth / 2, 350);
-
-        ctx.font = "20px Arial";
-        ctx.fillStyle = "#aaa";
-        ctx.fillText("(Upgrade options coming in Step 3)", canvasWidth / 2, 390);
+        // Draw upgrade cards
+        for (let i = 0; i < this.currentChoices.length; i++) {
+            this.drawCard(ctx, i, canvasWidth);
+        }
 
         // Instructions
-        ctx.fillStyle = "white";
-        ctx.font = "24px Arial";
-        ctx.fillText("Press SPACE to skip and continue", canvasWidth / 2, canvasHeight - 80);
+        ctx.fillStyle = "#aaa";
+        ctx.font = "20px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Click a card to choose  |  SPACE to skip", canvasWidth / 2, canvasHeight - 60);
     }
 
     /**
-     * Draw the inventory at bottom left (Step 6)
-     * @param {CanvasRenderingContext2D} ctx - Canvas context
+     * Draw a single upgrade card
      */
-    drawInventory(ctx) {
-        // TODO: Implement inventory display (Step 6)
+    drawCard(ctx, index, canvasWidth) {
+        const upgrade = this.currentChoices[index];
+        const r = this.getCardRect(index, canvasWidth);
+        const hovered = index === this.hoveredIndex;
+
+        // Card background
+        ctx.fillStyle = hovered ? "rgba(255, 255, 255, 0.18)" : "rgba(255, 255, 255, 0.08)";
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+
+        // Card border (color by type)
+        const borderColor = upgrade.type === "weapon" ? "rgba(255, 100, 100, 0.9)"
+                          : upgrade.type === "passive" ? "rgba(100, 200, 255, 0.9)"
+                          : "rgba(100, 255, 100, 0.9)";
+        ctx.strokeStyle = hovered ? "white" : borderColor;
+        ctx.lineWidth = hovered ? 3 : 2;
+        ctx.strokeRect(r.x, r.y, r.w, r.h);
+
+        // Icon (centered, 64x64)
+        const iconSize = 64;
+        const iconX = r.x + (r.w - iconSize) / 2;
+        const iconY = r.y + 25;
+        if (upgrade.image && upgrade.image.complete) {
+            ctx.drawImage(upgrade.image, iconX, iconY, iconSize, iconSize);
+        } else {
+            ctx.fillStyle = "#555";
+            ctx.fillRect(iconX, iconY, iconSize, iconSize);
+        }
+
+        // Name
+        ctx.fillStyle = "white";
+        ctx.font = "bold 20px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(upgrade.name, r.x + r.w / 2, iconY + iconSize + 30);
+
+        // Type tag
+        ctx.font = "14px Arial";
+        ctx.fillStyle = borderColor;
+        ctx.fillText(`[${upgrade.type.toUpperCase()}]`, r.x + r.w / 2, iconY + iconSize + 50);
+
+        // Description (word-wrap in card)
+        ctx.fillStyle = "#ccc";
+        ctx.font = "14px Arial";
+        this.drawWrappedText(ctx, upgrade.description, r.x + r.w / 2, iconY + iconSize + 72, r.w - 20, 18);
+    }
+
+    /**
+     * Simple word-wrap text drawing
+     */
+    drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
+        const words = text.split(' ');
+        let line = '';
+        let curY = y;
+        for (const word of words) {
+            const testLine = line + (line ? ' ' : '') + word;
+            if (ctx.measureText(testLine).width > maxWidth && line) {
+                ctx.fillText(line, x, curY);
+                line = word;
+                curY += lineHeight;
+            } else {
+                line = testLine;
+            }
+        }
+        if (line) ctx.fillText(line, x, curY);
     }
 }
 
