@@ -2,9 +2,18 @@ import Sprite from "./Sprite.js";
 
 export default class Entity extends Sprite {
     constructor(camera) {
-       super("assets/Chicken_Enemy.png", {
-            radius: 40 
-        });
+
+        if(Math.random()<0.5) {
+            super("assets/Chicken_Enemy.png", {
+                radius: 40
+            });
+        }else{
+            super("assets/Demon.png", {
+                radius: 30
+            });
+        }
+
+
         this.spawn(camera);
         this.speed = 2; 
     }
