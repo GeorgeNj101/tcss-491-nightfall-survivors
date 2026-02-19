@@ -3,7 +3,7 @@ import Sprite from "./Sprite.js";
 export default class Entity extends Sprite {
     constructor(camera) {
        super("assets/Chicken_Enemy.png", {
-            radius: 30 
+            radius: 40 
         });
         this.spawn(camera);
         this.speed = 2; 

@@ -443,7 +443,7 @@ export default class Game {
             console.log("DEBUG: Speed Increased! Speed: " + this.stats.speed);
         }
         if (this.stats.level % 3 === 0 ){
-            this.stats.attackCooldown = Math.max(30, this.stats.attackCooldown - 20);
+            this.stats.attackCooldown = Math.max(60, this.stats.attackCooldown - 30);
             console.log("DEBUG: Attack Speed Increased! Cooldown: " + this.stats.attackCooldown);
         }
     }
