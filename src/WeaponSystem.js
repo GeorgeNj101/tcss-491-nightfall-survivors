@@ -19,7 +19,7 @@ export default class WeaponSystem {
         const speed = stats.projectileSpeed || 500;
         const damage = stats.damage || 5;
         const range = stats.range || 400;
-        const sprite = stats.projectileSprite || "assets/Fireball.png";
+        const sprite = stats.projectileSprite || "assets/Shuriken.png";
 
         // Normalize direction
         const len = Math.hypot(directionX, directionY) || 1;

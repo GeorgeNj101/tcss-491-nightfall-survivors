@@ -42,29 +42,37 @@ export default class Projectile extends Sprite {
     }
 
     draw(ctx, gameFrame, screenX, screenY) {
-
-        if(this.vx<0){
-            if(this.vy>0){
-                this.rowdir=0;
-            }else{
-                this.rowdir=3
-            }
-        }else {
-            if(this.vy<0){
-                this.rowdir=2
-            }else{
-                this.rowdir=1
-            }
-        }
-        let frame = gameFrame % 4
-        if (!this.loaded) return;
-        // Projectile specific draw: renders smaller than the raw image
-       ctx.drawImage(this.image, frame*this.frameWidth, this.rowdir*this.frameHeight, this.frameWidth, this.frameHeight, screenX+this.radius/2-this.frameWidth/2, screenY+this.radius/2-this.frameHeight/2, this.frameWidth, this.frameHeight);
-        if (this.showHitbox) {
-            ctx.beginPath();
-            ctx.strokeStyle = "yellow";
-            ctx.arc(screenX + this.size/2, screenY + this.size/2, this.radius, 0, Math.PI*2);
-            ctx.stroke();
-        }
+    if (this.vx < 0) {
+        this.rowdir = (this.vy > 0) ? 0 : 3;
+    } else {
+        this.rowdir = (this.vy < 0) ? 2 : 1;
     }
+    let frame = gameFrame % 4;
+    
+    if (!this.loaded) return;
+
+    // Use the custom size you want (32px)
+    const drawW = this.size;
+    const drawH = this.size;
+
+    // Anchor the drawing exactly to the center of the physical hitbox
+    const dx = screenX + (this.frameWidth / 2) - (drawW / 2);
+    const dy = screenY + (this.frameHeight / 2) - (drawH / 2);
+
+    ctx.drawImage(
+        this.image, 
+        frame * this.frameWidth, this.rowdir * this.frameHeight, 
+        this.frameWidth, this.frameHeight, 
+        dx, dy, 
+        drawW, drawH
+    );
+
+    if (this.showHitbox) {
+        ctx.beginPath();
+        ctx.strokeStyle = "yellow";
+        // Anchor the debug circle exactly to the physics center
+        ctx.arc(screenX + this.frameWidth/2, screenY + this.frameHeight/2, this.radius, 0, Math.PI*2);
+        ctx.stroke();
+    }
+}
 }

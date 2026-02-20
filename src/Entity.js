@@ -16,7 +16,10 @@ export default class Entity extends Sprite {
 
         this.spawn(camera);
         this.speed = 2; 
+        this.maxHp = 100;
+        this.hp = this.maxHp;
     }
+
 
     spawn(camera) {
     const offset = 200; 
@@ -29,7 +32,7 @@ export default class Entity extends Sprite {
         spawnX > camera.x && spawnX < camera.x + camera.width &&
         spawnY > camera.y && spawnY < camera.y + camera.height
     ) {
-        // If spawned inside screen, push it out
+    // If spawned inside screen, push it out
         this.y = (Math.random() > 0.5) ? camera.y - offset : camera.y + camera.height + offset;
         this.x = spawnX;
     } else {
@@ -68,7 +71,32 @@ export default class Entity extends Sprite {
             this.moving = false;
         }
     }
+    draw(ctx, gameFrame, screenX, screenY) {
+        super.draw(ctx, gameFrame, screenX, screenY);
 
+        // 2. Draw Health Bar (Optional: Only show if damaged -> if (this.hp < this.maxHp))
+        if (this.hp > 0) {
+            const barWidth = 40; 
+            const barHeight = 6;
+            // Center the bar above the sprite
+            const barX = screenX + (this.frameWidth / 2) - (barWidth / 2);
+            const barY = screenY + 10; 
+
+            // Background (Black)
+            ctx.fillStyle = "black";
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+
+            // Foreground (Red)
+            const hpPercent = Math.max(0, this.hp / this.maxHp);
+            ctx.fillStyle = "#ff4444"; 
+            ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
+
+            // Border
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(barX, barY, barWidth, barHeight);
+        }
+    }
     // For Z-Index sorting
     getBottomY() {
         return this.y + this.frameHeight;

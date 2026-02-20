@@ -34,7 +34,7 @@ export default class LevelUp {
                     projectileSpeed: 600, // px/sec
                     range: 500,           // px
                     spread: 0,            // degrees
-                    projectileSprite: "assets/Fireball.png" // or a bullet sprite
+                    projectileSprite: "assets/Shuriken.png" // or a bullet sprite
                 }
             ),
             // Xp Orb

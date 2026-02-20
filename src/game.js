@@ -196,7 +196,7 @@ export default class Game {
         if (this.keys["x"]) {
             // Only run if NOT locked
             if (!this.cheatLocked) {
-                this.levelUp();
+                this.levelUpSystem.addXP(1);
                 console.log("DEBUG: Level Up (Cheat)");
                 this.cheatLocked = true; // Lock it immediately
             }
@@ -288,8 +288,9 @@ export default class Game {
 
             for (let j = this.enemies.length - 1; j >= 0; j--) {
                 const enemy = this.enemies[j];
+                if (enemy.markedForDeletion) continue;
                 if (p.collidesWith(enemy)) {
-                    if (typeof enemy.hp === 'number') {
+                    if ( enemy.hp >  100) {
                         const dmg = 50;
                         enemy.hp -= dmg;
                         p.markedForDeletion = true;
@@ -301,10 +302,16 @@ export default class Game {
                             this.score += 250;
                         }
                     } else {
-                        enemy.markedForDeletion = true;
+                        const dmg = 50;
+                        enemy.hp -= dmg;
                         p.markedForDeletion = true;
-                        this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
-                        this.score += 10;
+                        if (enemy.hp <= 0) {
+                            enemy.markedForDeletion = true;
+                            for (let k = 0; k < 1; k++) {
+                                this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                            }
+                            this.score += 10;
+                        }
                     }
                     break;
                 }
@@ -315,10 +322,11 @@ export default class Game {
         this.enemies.forEach(enemy => {
             enemy.update(this.player.x, this.player.y, this);
             if (this.player.collidesWith(enemy)) {
-                if (typeof enemy.hp === 'number') {
-                    if (this.stats.hp > 0) this.stats.hp -= 0.05;
-                } else {
+                if ( enemy.hp > 100) {
                     if (this.stats.hp > 0) this.stats.hp -= 20;
+                   
+                } else {
+                    if (this.stats.hp > 0) this.stats.hp -= 10;
                     enemy.markedForDeletion = true;
                 }
             }

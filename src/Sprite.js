@@ -25,6 +25,9 @@ export default class Sprite {
             // Optional: Recalculate frame size if image is different than expected
             this.frameWidth = this.image.width / this.cols;
             this.frameHeight = this.image.height / this.rows;
+            if (!config.radius) {
+            this.radius = this.frameWidth / 2.5;
+    }
         };
         this.image.src = pngPath;
 

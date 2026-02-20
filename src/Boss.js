@@ -56,6 +56,31 @@ export default class Boss extends Entity {
             ctx.strokeStyle = "orange";
             ctx.arc(screenX + this.frameWidth/2, screenY + this.frameHeight/2, this.radius, 0, Math.PI*2);
             ctx.stroke();
+            
+        }
+        if (this.hp > 0) {
+            // Make the boss health bar wider
+            const barWidth = 80; 
+            const barHeight = 8;
+            
+            // Center it over the pulsing sprite
+            const barX = screenX + (this.frameWidth / 2) - (barWidth / 2);
+            // Place it above the pulsing height
+            const barY = screenY + (this.frameHeight / 2) - (drawH / 2) - 20; 
+
+            // Background
+            ctx.fillStyle = "black";
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+
+            // Foreground
+            const hpPercent = Math.max(0, this.hp / this.maxHp);
+            ctx.fillStyle = "#ff4444"; 
+            ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
+
+            // Border
+            ctx.strokeStyle = "gold"; // Give the boss a fancy gold border
+            ctx.lineWidth = 2;
+            ctx.strokeRect(barX, barY, barWidth, barHeight);
         }
     }
 
