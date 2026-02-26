@@ -1,11 +1,11 @@
 import Sprite from "./Sprite.js";
 
-export default class XpOrb extends Sprite {
+export default class HeartPickup extends Sprite {
     constructor(x, y) {
-        super("assets/Xp_Orb.png", { 
+        super("assets/Heart.png", {
             x: x, 
             y: y, 
-            cols: 7,
+            cols: 4,
             rows: 1,
             sheetWidth: 224, 
             sheetHeight: 32,

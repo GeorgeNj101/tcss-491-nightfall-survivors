@@ -59,7 +59,7 @@ export default class LevelUp {
                 "Health Regen",
                 "+1 Health Regeneration",
                 (game) => {
-                    game.stats.hpRegen += 1;
+                    game.stats.hpRegen += 0.1;
                 }
             ),
 

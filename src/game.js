@@ -6,6 +6,7 @@ import Boss from "./Boss.js";
 import Camera from "./Camera.js";
 import LevelUp from "./LevelUp.js";
 import Inventory from "./Inventory.js";
+import HeartPickup from "./HeartPickup.js";
 
 export default class Game {
     constructor(canvas) {
@@ -17,6 +18,7 @@ export default class Game {
         this.keys = {};
         this.enemies = [];
         this.xpOrbs = [];
+        this.HeartPickups = [];
         this.projectiles = [];
         this.gameFrame = 0;
         this.fps = 6;
@@ -139,7 +141,7 @@ export default class Game {
             this.handleWaveSystem(timestamp);
             this.handleMovement();
             this.handleCombat();
-            this.handleXpCollection();
+            this.handlePickupCollection();
 
             if (this.stats.hp <= 0) {
                 this.isDead = true;
@@ -246,7 +248,8 @@ export default class Game {
     }
     handleCombat() {
 
-        this.stats.maxHp+=this.stats.hpRegen
+        this.stats.hp+=this.stats.hpRegen
+        this.stats.hp = Math.min(this.stats.hp,this.stats.maxHp)
 
         const spawnX = this.player.x + this.player.frameWidth / 2 - 16;
         const spawnY = this.player.y + this.player.frameHeight / 2 - 16;
@@ -304,6 +307,9 @@ export default class Game {
                             enemy.markedForDeletion = true;
                             for (let k = 0; k < 8; k++) {
                                 this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                                if(Math.random() < 1/3) {
+                                    this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                                }
                             }
                             this.score += 250;
                         }
@@ -315,6 +321,9 @@ export default class Game {
                             enemy.markedForDeletion = true;
                             for (let k = 0; k < 1; k++) {
                                 this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                                if(Math.random() < 1/3) {
+                                    this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                                }
                             }
                             this.score += 10;
                         }
@@ -342,7 +351,7 @@ export default class Game {
         this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
         this.enemies = this.enemies.filter(e => !e.markedForDeletion);
     }
-    handleXpCollection() {
+    handlePickupCollection() {
         this.xpOrbs.forEach(orb => {
             const dist = orb.getDistance(this.player);
             if (dist < 150) { // Magnet range
@@ -357,7 +366,25 @@ export default class Game {
                 this.levelUpSystem.addXP(1); // Use LevelUp system
             }
         });
+
+        this.HeartPickups.forEach(heart => {
+            const dist = heart.getDistance(this.player);
+            if (dist < 150) { // Magnet range
+                const moveX = (this.player.x - heart.x) * 0.1;
+                const moveY = (this.player.y - heart.y) * 0.1;
+                heart.x += moveX;
+                heart.y += moveY;
+            }
+            if (this.player.collidesWith(heart)) {
+                heart.markedForDeletion = true;
+                console.log("DEBUG: Heart Collected!");
+                this.stats.hp += 10;
+                this.stats.hp = Math.min(this.stats.hp,this.stats.maxHp)
+            }
+        });
+
         this.xpOrbs = this.xpOrbs.filter(o => !o.markedForDeletion);
+        this.HeartPickups = this.HeartPickups.filter(o => !o.markedForDeletion);
     }
 
     // levelUp() {
@@ -413,7 +440,7 @@ export default class Game {
             return;
         }
 
-        const renderList = [this.player, ...this.enemies, ...this.xpOrbs, ...this.projectiles];
+        const renderList = [this.player, ...this.enemies, ...this.xpOrbs,...this.HeartPickups, ...this.projectiles];
         renderList.sort((a, b) => (a.y + a.frameHeight) - (b.y + b.frameHeight));
 
         renderList.forEach(obj => {
