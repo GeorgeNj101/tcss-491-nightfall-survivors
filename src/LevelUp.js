@@ -59,7 +59,7 @@ export default class LevelUp {
                 "Health Regen",
                 "+1 Health Regeneration",
                 (game) => {
-                    game.stats.hpRegen += 0.1;
+                    game.stats.hpRegen += 1/30;
                 }
             ),
 
@@ -73,6 +73,18 @@ export default class LevelUp {
                 (game) => {
                     game.stats.maxHp += 10;
                     game.stats.hp += 10;
+                }
+            ),
+
+            //Max HP
+            new ItemObject(
+                6,
+                this.loadImage("assets/Shield.png"),
+                "passive",
+                "Defense",
+                "+1 Defense",
+                (game) => {
+                    game.stats.defense++;
                 }
             )
 

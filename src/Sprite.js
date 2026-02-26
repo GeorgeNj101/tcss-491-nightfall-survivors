@@ -60,8 +60,8 @@ export default class Sprite {
 
     collidesWith(other) {
         // 1. Get centers
-        const dx = (this.x + this.frameWidth/2) - (other.x + other.frameWidth/2);
-        const dy = (this.y + this.frameHeight/2) - (other.y + other.frameHeight/2);
+        const dx = (this.centerX()) - (other.centerX());
+        const dy = (this.centerY()) - (other.centerY());
         
         // 2. Get distance
         const distance = Math.hypot(dx, dy);
@@ -95,6 +95,14 @@ export default class Sprite {
             ctx.arc(screenX + this.frameWidth/2, screenY + this.frameHeight/2, this.radius, 0, Math.PI*2);
             ctx.stroke();
         }
+    }
+
+    centerX(){
+        return this.x + this.frameWidth/2;
+    }
+
+    centerY(){
+        return this.y + this.frameHeight/2;
     }
     
 }

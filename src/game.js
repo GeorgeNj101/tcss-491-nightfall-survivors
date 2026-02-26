@@ -50,7 +50,8 @@ export default class Game {
             speed: 4,
             attackCooldown: 180,
             attackTimer: 0,
-            hpRegen : 0
+            hpRegen : 0,
+            defense : 0
         };
 
         // --- Wave Logic ---
@@ -246,6 +247,7 @@ export default class Game {
         // Update Camera to follow player
         // this.camera.update(this.player);
     }
+
     handleCombat() {
 
         this.stats.hp+=this.stats.hpRegen
@@ -338,10 +340,10 @@ export default class Game {
             enemy.update(this.player.x, this.player.y, this);
             if (this.player.collidesWith(enemy)) {
                 if ( enemy.hp > 100) {
-                    if (this.stats.hp > 0) this.stats.hp -= 20;
+                    if (this.stats.hp > 0) this.processDamage(20)
                    
                 } else {
-                    if (this.stats.hp > 0) this.stats.hp -= 10;
+                    if (this.stats.hp > 0) this.processDamage(10)
                     enemy.markedForDeletion = true;
                 }
             }
@@ -351,12 +353,17 @@ export default class Game {
         this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
         this.enemies = this.enemies.filter(e => !e.markedForDeletion);
     }
+
+    processDamage(damage) {
+        this.stats.hp -= Math.max(1, damage-this.stats.defense/2);
+    }
+
     handlePickupCollection() {
         this.xpOrbs.forEach(orb => {
             const dist = orb.getDistance(this.player);
             if (dist < 150) { // Magnet range
-                const moveX = (this.player.x - orb.x) * 0.1;
-                const moveY = (this.player.y - orb.y) * 0.1;
+                const moveX = (this.player.centerX() - orb.centerX()) * 0.1;
+                const moveY = (this.player.centerY() - orb.centerY()) * 0.1;
                 orb.x += moveX;
                 orb.y += moveY;
             }
@@ -370,8 +377,8 @@ export default class Game {
         this.HeartPickups.forEach(heart => {
             const dist = heart.getDistance(this.player);
             if (dist < 150) { // Magnet range
-                const moveX = (this.player.x - heart.x) * 0.1;
-                const moveY = (this.player.y - heart.y) * 0.1;
+                const moveX = (this.player.centerX() - heart.centerX()) * 0.1;
+                const moveY = (this.player.centerY() - heart.centerY()) * 0.1;
                 heart.x += moveX;
                 heart.y += moveY;
             }

@@ -9,7 +9,7 @@ export default class Projectile extends Sprite {
         this.vx = dx; 
         this.vy = dy; 
         this.speed = 8;
-        this.size = 32;
+        this.size = 128;
         
 
         this.timer = 0;

@@ -75,8 +75,15 @@ export default class Inventory {
 					// Draw item if exists
 					const item = this.inventory[i];
 					if (item && item.image && item.image.complete) {
+
+							let cardX = item.frameWidth
+							let cardFrame = this.game.gameFrame%item.frame
 							ctx.drawImage(
 									item.image,
+									cardX*cardFrame,
+									0,
+									cardX,
+									item.image.height,
 									x + 5,
 									y + 5,
 									slotSize - 10,
