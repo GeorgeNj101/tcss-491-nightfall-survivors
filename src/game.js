@@ -19,6 +19,8 @@ export default class Game {
         this.xpOrbs = [];
         this.projectiles = [];
         this.gameFrame = 0;
+        this.fps = 6;
+        this.frameTime = 1000/this.fps;
         this.isDead = false;
         this.elapsedTime = 0;
         this.lastSecondTime = 0;
@@ -45,7 +47,8 @@ export default class Game {
             level: 1,
             speed: 4,
             attackCooldown: 180,
-            attackTimer: 0
+            attackTimer: 0,
+            hpRegen : 0
         };
 
         // --- Wave Logic ---
@@ -131,7 +134,7 @@ export default class Game {
 
         // Don't update game logic if paused (level up menu)
         if (!this.gamePaused) {
-            this.gameFrame++;
+            this.gameFrame = Math.floor(timestamp/this.frameTime)
             this.updateTimers(timestamp);
             this.handleWaveSystem(timestamp);
             this.handleMovement();
@@ -242,6 +245,9 @@ export default class Game {
         // this.camera.update(this.player);
     }
     handleCombat() {
+
+        this.stats.maxHp+=this.stats.hpRegen
+
         const spawnX = this.player.x + this.player.frameWidth / 2 - 16;
         const spawnY = this.player.y + this.player.frameHeight / 2 - 16;
 
@@ -423,7 +429,7 @@ export default class Game {
                 screenY + obj.frameHeight > -100 &&
                 screenY < this.height + 100
             ) {
-                obj.draw(this.ctx, Math.floor(this.gameFrame / 4), screenX, screenY);
+                obj.draw(this.ctx,this.gameFrame, screenX, screenY);
             }
         });
 

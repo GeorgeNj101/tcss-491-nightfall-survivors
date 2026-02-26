@@ -12,11 +12,14 @@ export default class LevelUp {
         // Level up state
         this.isLevelingUp = false;
         this.pendingLevelUps = 0; // Track multiple level ups at once
+
+        this.LevelUpFrame = Math.floor(game.lastTime/this.game.frameTime);
         
         // Upgrade options (will be populated in Step 3)
         this.availableUpgrades = [
             // Pistol weapon
             new ItemObject(
+                1,
                 this.loadImage("assets/pistol.png"),
                 "weapon",
                 "Pistol",
@@ -39,6 +42,7 @@ export default class LevelUp {
             ),
             // Xp Orb
             new ItemObject(
+                1,
                 this.loadImage("assets/Xp_Orb.png"),
                 "passive",
                 "Sprint",
@@ -47,6 +51,30 @@ export default class LevelUp {
                     game.stats.speed += 1;
                 }
             ),
+            //HP Regen
+            new ItemObject(
+                4,
+                this.loadImage("assets/Regen.png"),
+                "passive",
+                "Health Regen",
+                "+1 Health Regeneration",
+                (game) => {
+                    game.stats.hpRegen += 1;
+                }
+            ),
+
+            //Max HP
+            new ItemObject(
+                4,
+                this.loadImage("assets/Max Health.png"),
+                "passive",
+                "Max Hp",
+                "+10 Maximum Health",
+                (game) => {
+                    game.stats.maxHp += 10;
+                    game.stats.hp += 10;
+                }
+            )
 
         ];
         
@@ -191,6 +219,7 @@ export default class LevelUp {
     closeLevelUpMenu() {
         this.isLevelingUp = false;
         this.pendingLevelUps = 0;
+        this.LevelUpFrame = 0
 
         if (this.game) {
             const pauseDuration = performance.now() - this.game.pauseStartTime;
@@ -345,7 +374,9 @@ export default class LevelUp {
         const iconX = r.x + (r.w - iconSize) / 2;
         const iconY = r.y + 25;
         if (upgrade.image && upgrade.image.complete) {
-            ctx.drawImage(upgrade.image, iconX, iconY, iconSize, iconSize);
+            let cardX = upgrade.frameWidth
+            let cardFrame = this.LevelUpFrame%upgrade.frame
+            ctx.drawImage(upgrade.image, cardX * cardFrame, 0, cardX, upgrade.image.height, iconX, iconY, iconSize, iconSize);
         } else {
             ctx.fillStyle = "#555";
             ctx.fillRect(iconX, iconY, iconSize, iconSize);
@@ -366,6 +397,7 @@ export default class LevelUp {
         ctx.fillStyle = "#ccc";
         ctx.font = "14px Arial";
         this.drawWrappedText(ctx, upgrade.description, r.x + r.w / 2, iconY + iconSize + 72, r.w - 20, 18);
+        this.LevelUpFrame=Math.floor(this.game.lastTime/this.game.frameTime);
     }
 
     /**
