@@ -7,6 +7,7 @@ import Camera from "./Camera.js";
 import LevelUp from "./LevelUp.js";
 import Inventory from "./Inventory.js";
 import HeartPickup from "./HeartPickup.js";
+import Slash from "./Slash.js";
 
 export default class Game {
     constructor(canvas) {
@@ -27,6 +28,7 @@ export default class Game {
         this.elapsedTime = 0;
         this.lastSecondTime = 0;
         this.lastTime = 0;
+        this.lastDrawTime = 0;
         this.score = 0;
         this.gamePaused = false; // For level up menu
         this.pauseStartTime = 0; // Track when pause started
@@ -39,6 +41,7 @@ export default class Game {
         this.player = new Sprite("assets/Main_Character.png");
         this.player.x = this.width / 2 - 64; 
         this.player.y = this.height / 2 - 64;
+        this.slash = new Slash(this.player);
         this.camera = new Camera(this.width, this.height);
 
         this.stats = {
@@ -430,6 +433,9 @@ export default class Game {
     }
 
     draw(timestamp) {
+
+        {
+            this.lastDrawTime = timestamp;
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.drawBackground();
 
@@ -447,7 +453,10 @@ export default class Game {
             return;
         }
 
-        const renderList = [this.player, ...this.enemies, ...this.xpOrbs,...this.HeartPickups, ...this.projectiles];
+        const renderList = [this.player,
+            this.slash,
+            ...this.enemies, ...this.xpOrbs, ...this.HeartPickups, ...this.projectiles];
+        this.slash.updateDirection()
         renderList.sort((a, b) => (a.y + a.frameHeight) - (b.y + b.frameHeight));
 
         renderList.forEach(obj => {
@@ -457,13 +466,13 @@ export default class Game {
 
             // Optimization: Only draw if visible on screen (Culling)
             // Add a buffer (e.g., 100px) so sprites don't pop out at edges
-            if (
+            if (obj.isRotated===true||(
                 screenX + obj.frameWidth > -100 &&
                 screenX < this.width + 100 &&
                 screenY + obj.frameHeight > -100 &&
-                screenY < this.height + 100
+                screenY < this.height + 100)
             ) {
-                obj.draw(this.ctx,this.gameFrame, screenX, screenY);
+                obj.draw(this.ctx, this.gameFrame, screenX, screenY);
             }
         });
 
@@ -480,6 +489,7 @@ export default class Game {
         // Draw level up menu if active
         if (this.levelUpSystem.isLevelingUp) {
             this.levelUpSystem.drawLevelUpMenu(this.ctx, this.width, this.height);
+        }
         }
     }
 
@@ -769,7 +779,6 @@ export default class Game {
 
     // --- FIX: Pass timestamp to draw() so the UI timer works ---
     this.draw(timestamp);
-
     requestAnimationFrame(this.animate);
     }
 }

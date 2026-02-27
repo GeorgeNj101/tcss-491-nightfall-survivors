@@ -1,5 +1,6 @@
 export default class Sprite {
     constructor(pngPath, config = {}) {
+        this.isRotated = false;
         this.x = config.x || 0;
         this.y = config.y || 0;
         
