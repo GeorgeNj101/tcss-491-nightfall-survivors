@@ -85,19 +85,60 @@ export default class Slash extends Sprite {
             let CenterScreenX = screenX + this.frameWidth/2
             let CenterScreenY = screenY + this.frameHeight/2
 
+            const Angle = 90/360*2*Math.PI;
+            const SubAngle = Angle/3
+            let hitLocation
+
+            //frame is Up, middle, down, middle
+            if((gameFrame % this.cols) === 0){
+                hitLocation = 0
+            }else if((gameFrame % this.cols)=== 2){
+                hitLocation = 2
+            }else {
+                hitLocation = 1
+            }
+
+
             // --- DRAW HITBOX LINES HERE (While origin is at centerX/Y) ---
             if (this.showHitbox) {
                 ctx.beginPath();
                 ctx.strokeStyle = "red";
-                const Angle = 90/360*2*Math.PI;
 
                 // Line 1
-                ctx.moveTo(CenterScreenX, CenterScreenY);
+                ctx.moveTo(CenterScreenX -(this.radius * Math.cos(-Angle/2))/2,
+                    CenterScreenY -(this.radius*Math.sin(-Angle/2))/2);
                 ctx.lineTo(CenterScreenX-this.radius * Math.cos(-Angle/2), CenterScreenY-this.radius * Math.sin(-Angle/2));
 
                 // Line 2
-                ctx.moveTo(CenterScreenX, CenterScreenY);
+                ctx.moveTo(CenterScreenX-(this.radius*Math.cos(Angle/2))/2,
+                    CenterScreenY -(this.radius*Math.sin(Angle/2))/2)
                 ctx.lineTo(CenterScreenX- this.radius * Math.cos(Angle/2), CenterScreenY -this.radius * Math.sin(Angle/2));
+
+                ctx.stroke();
+            }
+
+            // --- DRAW HITBOX  SUB LINES HERE (While origin is at centerX/Y) ---
+            if (this.showHitbox) {
+                ctx.beginPath();
+                ctx.strokeStyle = "green";
+
+
+
+                // Line 1
+                ctx.moveTo(CenterScreenX - (this.radius * Math.cos(-Angle/2 + SubAngle*(2-hitLocation)))/2
+                    , CenterScreenY - (this.radius * Math.sin(-Angle/2 + SubAngle*(2-hitLocation)))/2);
+                ctx.lineTo(CenterScreenX-this.radius * Math.cos(-Angle/2 + SubAngle*(2-hitLocation)),
+                    CenterScreenY-this.radius * Math.sin(-Angle/2 + SubAngle*(2-hitLocation)));
+                ctx.stroke()
+                ctx.beginPath()
+
+                ctx.strokeStyle = "blue";
+
+                // Line 2
+                ctx.moveTo(CenterScreenX -(this.radius * Math.cos(Angle/2 -SubAngle*(hitLocation)))/2,
+                    CenterScreenY-(this.radius * Math.sin(Angle/2-SubAngle*(hitLocation)))/2);
+                ctx.lineTo(CenterScreenX- this.radius * Math.cos(Angle/2 -SubAngle*(hitLocation),),
+                    CenterScreenY -this.radius * Math.sin(Angle/2-SubAngle*(hitLocation)));
 
                 ctx.stroke();
             }
