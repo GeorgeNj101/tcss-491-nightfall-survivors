@@ -23,21 +23,15 @@ export default class LevelUp {
                 this.loadImage("assets/pistol.png"),
                 "weapon",
                 "Pistol",
-                "Basic pistol. Medium damage, medium fire rate.",
-                (game) => {
-                    // When acquired, set as current weapon and add to inventory
-                    const pistolItem = game.inventory.inventory.find(i => i.name === "Pistol");
-                    if (pistolItem) {
-                        game.currentWeapon = pistolItem;
-                    }
-                },
+                "Slow but reliable sidearm. Click inventory to equip.",
+                null, // No auto-effect — player must click inventory to equip
                 {
-                    damage: 10,
-                    fireRate: 3,          // shots per second
-                    projectileSpeed: 600, // px/sec
-                    range: 500,           // px
-                    spread: 0,            // degrees
-                    projectileSprite: "assets/Shuriken.png" // or a bullet sprite
+                    damage: 15,
+                    fireRate: 1.5,        // 1.5 shots per second (slow)
+                    projectileSpeed: 480, // px/sec
+                    range: 400,           // px
+                    spread: 0,
+                    projectileSprite: "assets/Fireball.png"
                 }
             ),
             // Xp Orb

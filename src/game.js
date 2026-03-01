@@ -7,6 +7,7 @@ import Camera from "./Camera.js";
 import LevelUp from "./LevelUp.js";
 import Inventory from "./Inventory.js";
 import HeartPickup from "./HeartPickup.js";
+import Slash from "./Slash.js";
 
 export default class Game {
     constructor(canvas) {
@@ -28,6 +29,7 @@ export default class Game {
         this.elapsedTime = 0;
         this.lastSecondTime = 0;
         this.lastTime = 0;
+        this.lastDrawTime = 0;
         this.score = 0;
         this.gamePaused = false; // For level up menu
         this.pauseStartTime = 0; // Track when pause started
@@ -44,6 +46,7 @@ export default class Game {
         this.player = new Sprite("assets/Main_Character.png");
         this.player.x = this.width / 2 - 64; 
         this.player.y = this.height / 2 - 64;
+        this.slash = new Slash(this.player);
         this.camera = new Camera(this.width, this.height);
 
         this.stats = {
@@ -116,9 +119,15 @@ export default class Game {
             if (e.button === 0) this.mouse.down = false;
         });
         this.canvas.addEventListener("click", e => {
+            const rect = this.canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
             if (this.levelUpSystem && this.levelUpSystem.isLevelingUp) {
-                const rect = this.canvas.getBoundingClientRect();
-                this.levelUpSystem.handleClick(e.clientX - rect.left, e.clientY - rect.top);
+                this.levelUpSystem.handleClick(mx, my);
+            } else {
+                // Check inventory clicks
+                this.inventory.handleClick(mx, my);
             }
         });
         // Prevent right-click context menu on canvas
@@ -261,10 +270,10 @@ export default class Game {
         const spawnX = this.player.x + this.player.frameWidth / 2 - 16;
         const spawnY = this.player.y + this.player.frameHeight / 2 - 16;
 
-        // --- WEAPON SHOOTING (mouse-aimed) ---
+        // --- WEAPON SHOOTING (mouse-aimed, only when weapon equipped) ---
         if (this.currentWeapon && this.mouse.down) {
-            const stats = this.currentWeapon.stats || {};
-            const fireRate = stats.fireRate || 3; // shots per second
+            const wStats = this.currentWeapon.stats || {};
+            const fireRate = wStats.fireRate || 1; // shots per second
             const cooldownMs = 1000 / fireRate;
             const now = performance.now();
 
@@ -280,7 +289,7 @@ export default class Game {
                 const dy = worldMY - (this.player.y + this.player.frameHeight / 2);
                 const len = Math.hypot(dx, dy) || 1;
 
-                this.projectiles.push(new Projectile(spawnX, spawnY, dx / len, dy / len));
+                this.projectiles.push(new Projectile(spawnX, spawnY, dx / len, dy / len, wStats));
             }
         }
 
@@ -306,38 +315,21 @@ export default class Game {
                 const enemy = this.enemies[j];
                 if (enemy.markedForDeletion) continue;
                 if (p.collidesWith(enemy)) {
-                    if ( enemy.hp >  100) {
-                        const dmg = 50;
-                        enemy.hp -= dmg;
-                        p.markedForDeletion = true;
-                        if (enemy.hp <= 0) {
-                            enemy.markedForDeletion = true;
-                            for (let k = 0; k < 8; k++) {
-                                this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
-                                if(Math.random() < 1/3) {
-                                    this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
-                                }
+                    const dmg = p.damage || 10;
+                    enemy.hp -= dmg;
+                    p.markedForDeletion = true;
+
+                    if (enemy.hp <= 0) {
+                        enemy.markedForDeletion = true;
+                        const isBoss = enemy.maxHp > 100;
+                        const orbCount = isBoss ? 8 : 1;
+                        for (let k = 0; k < orbCount; k++) {
+                            this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                            if (Math.random() < 1/3) {
+                                this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
                             }
-                            this.score += 250;
                         }
-                    } else {
-                        const dmg = 50;
-                        enemy.hp -= dmg;
-                        p.markedForDeletion = true;
-                        if (enemy.hp <= 0) {
-                            enemy.markedForDeletion = true;
-                            // if somehow a boss had <=100 hp this path would run, but treat as victory anyway
-                            if (enemy instanceof Boss) {
-                                this.isVictory = true;
-                            }
-                            for (let k = 0; k < 1; k++) {
-                                this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
-                                if(Math.random() < 1/3) {
-                                    this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
-                                }
-                            }
-                            this.score += 10;
-                        }
+                        this.score += isBoss ? 250 : 10;
                     }
                     break;
                 }
@@ -348,12 +340,14 @@ export default class Game {
         this.enemies.forEach(enemy => {
             enemy.update(this.player.x, this.player.y, this);
             if (this.player.collidesWith(enemy)) {
-                if ( enemy.hp > 100) {
-                    if (this.stats.hp > 0) this.processDamage(20)
-                   
+                const isBoss = enemy.maxHp > 100;
+                if (isBoss) {
+                    if (this.stats.hp > 0) this.processDamage(0.05);
                 } else {
-                    if (this.stats.hp > 0) this.processDamage(10)
+                    if (this.stats.hp > 0) this.processDamage(10);
                     enemy.markedForDeletion = true;
+                    this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
+                    this.score += 10;
                 }
             }
         });
@@ -444,6 +438,9 @@ export default class Game {
     }
 
     draw(timestamp) {
+
+        {
+            this.lastDrawTime = timestamp;
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.drawBackground();
 
@@ -461,7 +458,10 @@ export default class Game {
             return;
         }
 
-        const renderList = [this.player, ...this.enemies, ...this.xpOrbs,...this.HeartPickups, ...this.projectiles];
+        const renderList = [this.player,
+            this.slash,
+            ...this.enemies, ...this.xpOrbs, ...this.HeartPickups, ...this.projectiles];
+        this.slash.updateDirection()
         renderList.sort((a, b) => (a.y + a.frameHeight) - (b.y + b.frameHeight));
 
         renderList.forEach(obj => {
@@ -471,13 +471,13 @@ export default class Game {
 
             // Optimization: Only draw if visible on screen (Culling)
             // Add a buffer (e.g., 100px) so sprites don't pop out at edges
-            if (
+            if (obj.isRotated===true||(
                 screenX + obj.frameWidth > -100 &&
                 screenX < this.width + 100 &&
                 screenY + obj.frameHeight > -100 &&
-                screenY < this.height + 100
+                screenY < this.height + 100)
             ) {
-                obj.draw(this.ctx,this.gameFrame, screenX, screenY);
+                obj.draw(this.ctx, this.gameFrame, screenX, screenY);
             }
         });
 
@@ -498,6 +498,7 @@ export default class Game {
         // Draw level up menu if active
         if (this.levelUpSystem.isLevelingUp) {
             this.levelUpSystem.drawLevelUpMenu(this.ctx, this.width, this.height);
+        }
         }
     }
 
@@ -787,7 +788,6 @@ export default class Game {
 
     // --- FIX: Pass timestamp to draw() so the UI timer works ---
     this.draw(timestamp);
-
     requestAnimationFrame(this.animate);
     }
 
