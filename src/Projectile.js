@@ -2,18 +2,26 @@ import Sprite from "./Sprite.js";
 
 export default class Projectile extends Sprite {
     rowdir
-    constructor(x, y, dx, dy) {
-        // super("assets/Bolt.png", { x, y, cols: 1, rows: 1, radius: 30});
-        super("assets/Fireball.png", { x, y, cols: 4, rows: 4, radius: 30});
-        
-        this.vx = dx; 
-        this.vy = dy; 
-        this.speed = 8;
+    /**
+     * @param {number} x
+     * @param {number} y
+     * @param {number} dx  - normalized direction x
+     * @param {number} dy  - normalized direction y
+     * @param {object} [weaponStats] - optional stats from the weapon that fired this
+     *   { damage, projectileSpeed, range, projectileSprite }
+     */
+    constructor(x, y, dx, dy, weaponStats = null) {
+        const sprite = (weaponStats && weaponStats.projectileSprite) || "assets/Fireball.png";
+        super(sprite, { x, y, cols: 4, rows: 4, radius: 30});
+
+        this.vx = dx;
+        this.vy = dy;
+        this.damage = (weaponStats && weaponStats.damage) || 10;
+        this.speed = (weaponStats && weaponStats.projectileSpeed) ? weaponStats.projectileSpeed / 60 : 8;
         this.size = 32;
-        
 
         this.timer = 0;
-        this.maxTime = 200;
+        this.maxTime = (weaponStats && weaponStats.range) ? Math.ceil(weaponStats.range / (this.speed || 1)) : 200;
 
         if(this.vx===1){
             if(this.vy===1){
