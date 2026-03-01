@@ -24,6 +24,7 @@ export default class Game {
         this.fps = 6;
         this.frameTime = 1000/this.fps;
         this.isDead = false;
+        this.isVictory = false; // New flag for boss kill victory
         this.elapsedTime = 0;
         this.lastSecondTime = 0;
         this.lastTime = 0;
@@ -34,6 +35,10 @@ export default class Game {
 
         //FOR CHEATS/DEBUGGING
         this.cheatLocked = false;
+
+        // --- Invincibility Frames ---
+        this.lastDamageTime = 0;
+        this.invincibilityDuration = 2000; // milliseconds
 
         // --- Player Stats ---
         this.player = new Sprite("assets/Main_Character.png");
@@ -88,7 +93,7 @@ export default class Game {
     init() {
         window.addEventListener("keydown", e => {
             this.keys[e.key] = true;
-            if (this.isDead && e.key.toLowerCase() === 'r') location.reload();
+            if ((this.isDead || this.isVictory) && e.key.toLowerCase() === 'r') location.reload();
 
             // Handle SPACE key to close level up menu
             if (e.key === " " && this.levelUpSystem && this.levelUpSystem.isLevelingUp) {
@@ -130,7 +135,7 @@ export default class Game {
     }
 
     update(timestamp) {
-        if (this.isDead) return;
+        if (this.isDead || this.isVictory) return;
 
         // Only run game updates when playing
         if (this.screen !== 'playing') return;
@@ -321,6 +326,10 @@ export default class Game {
                         p.markedForDeletion = true;
                         if (enemy.hp <= 0) {
                             enemy.markedForDeletion = true;
+                            // if somehow a boss had <=100 hp this path would run, but treat as victory anyway
+                            if (enemy instanceof Boss) {
+                                this.isVictory = true;
+                            }
                             for (let k = 0; k < 1; k++) {
                                 this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
                                 if(Math.random() < 1/3) {
@@ -355,7 +364,12 @@ export default class Game {
     }
 
     processDamage(damage) {
-        this.stats.hp -= Math.max(1, damage-this.stats.defense/2);
+        const now = performance.now();
+        if (now - this.lastDamageTime < this.invincibilityDuration) {
+            return; // Still invincible
+        }
+        this.lastDamageTime = now;
+        this.stats.hp -= Math.max(1, damage - this.stats.defense / 2);
     }
 
     handlePickupCollection() {
@@ -475,7 +489,11 @@ export default class Game {
             this.drawCrosshair();
         }
 
-        if (this.isDead) this.drawDeathScreen();
+        if (this.isDead) {
+            this.drawDeathScreen();
+        } else if (this.isVictory) {
+            this.drawVictoryScreen();
+        }
 
         // Draw level up menu if active
         if (this.levelUpSystem.isLevelingUp) {
@@ -771,5 +789,17 @@ export default class Game {
     this.draw(timestamp);
 
     requestAnimationFrame(this.animate);
+    }
+
+    // show victory overlay
+    drawVictoryScreen() {
+        this.ctx.fillStyle = "rgba(0,0,0,0.8)";
+        this.ctx.fillRect(0, 0, this.width, this.height);
+        this.ctx.fillStyle = "gold";
+        this.ctx.textAlign = "center";
+        this.ctx.font = "80px Arial";
+        this.ctx.fillText("YOU WIN!", this.width / 2, this.height / 2 - 40);
+        this.ctx.font = "30px Arial";
+        this.ctx.fillText(`Survived ${this.elapsedTime}s - Press R to Restart`, this.width / 2, this.height / 2 + 40);
     }
 }
