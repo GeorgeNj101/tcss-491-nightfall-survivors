@@ -6,6 +6,8 @@ import Boss from "./Boss.js";
 import Camera from "./Camera.js";
 import LevelUp from "./LevelUp.js";
 import Inventory from "./Inventory.js";
+import HeartPickup from "./HeartPickup.js";
+import Slash from "./Slash.js";
 
 export default class Game {
     constructor(canvas) {
@@ -17,12 +19,16 @@ export default class Game {
         this.keys = {};
         this.enemies = [];
         this.xpOrbs = [];
+        this.HeartPickups = [];
         this.projectiles = [];
         this.gameFrame = 0;
+        this.fps = 6;
+        this.frameTime = 1000/this.fps;
         this.isDead = false;
         this.elapsedTime = 0;
         this.lastSecondTime = 0;
         this.lastTime = 0;
+        this.lastDrawTime = 0;
         this.score = 0;
         this.gamePaused = false; // For level up menu
         this.pauseStartTime = 0; // Track when pause started
@@ -35,6 +41,7 @@ export default class Game {
         this.player = new Sprite("assets/Main_Character.png");
         this.player.x = this.width / 2 - 64; 
         this.player.y = this.height / 2 - 64;
+        this.slash = new Slash(this.player);
         this.camera = new Camera(this.width, this.height);
 
         this.stats = {
@@ -45,7 +52,9 @@ export default class Game {
             level: 1,
             speed: 4,
             attackCooldown: 180,
-            attackTimer: 0
+            attackTimer: 0,
+            hpRegen : 0,
+            defense : 0
         };
 
         // --- Wave Logic ---
@@ -137,12 +146,12 @@ export default class Game {
 
         // Don't update game logic if paused (level up menu)
         if (!this.gamePaused) {
-            this.gameFrame++;
+            this.gameFrame = Math.floor(timestamp/this.frameTime)
             this.updateTimers(timestamp);
             this.handleWaveSystem(timestamp);
             this.handleMovement();
             this.handleCombat();
-            this.handleXpCollection();
+            this.handlePickupCollection();
 
             if (this.stats.hp <= 0) {
                 this.isDead = true;
@@ -247,7 +256,12 @@ export default class Game {
         // Update Camera to follow player
         // this.camera.update(this.player);
     }
+
     handleCombat() {
+
+        this.stats.hp+=this.stats.hpRegen
+        this.stats.hp = Math.min(this.stats.hp,this.stats.maxHp)
+
         const spawnX = this.player.x + this.player.frameWidth / 2 - 16;
         const spawnY = this.player.y + this.player.frameHeight / 2 - 16;
 
@@ -296,6 +310,34 @@ export default class Game {
                 const enemy = this.enemies[j];
                 if (enemy.markedForDeletion) continue;
                 if (p.collidesWith(enemy)) {
+                    if ( enemy.hp >  100) {
+                        const dmg = 50;
+                        enemy.hp -= dmg;
+                        p.markedForDeletion = true;
+                        if (enemy.hp <= 0) {
+                            enemy.markedForDeletion = true;
+                            for (let k = 0; k < 8; k++) {
+                                this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                                if(Math.random() < 1/3) {
+                                    this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                                }
+                            }
+                            this.score += 250;
+                        }
+                    } else {
+                        const dmg = 50;
+                        enemy.hp -= dmg;
+                        p.markedForDeletion = true;
+                        if (enemy.hp <= 0) {
+                            enemy.markedForDeletion = true;
+                            for (let k = 0; k < 1; k++) {
+                                this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                                if(Math.random() < 1/3) {
+                                    this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                                }
+                            }
+                            this.score += 10;
+                        }
                     const dmg = p.damage || 10;
                     enemy.hp -= dmg;
                     p.markedForDeletion = true;
@@ -318,11 +360,14 @@ export default class Game {
         this.enemies.forEach(enemy => {
             enemy.update(this.player.x, this.player.y, this);
             if (this.player.collidesWith(enemy)) {
+                if ( enemy.hp > 100) {
+                    if (this.stats.hp > 0) this.processDamage(20)
+                   
                 const isBoss = enemy.maxHp > 100;
                 if (isBoss) {
                     if (this.stats.hp > 0) this.stats.hp -= 0.05; // slow tick damage
                 } else {
-                    if (this.stats.hp > 0) this.stats.hp -= 10;
+                    if (this.stats.hp > 0) this.processDamage(10)
                     enemy.markedForDeletion = true;
                     this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
                     this.score += 10;
@@ -334,12 +379,17 @@ export default class Game {
         this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
         this.enemies = this.enemies.filter(e => !e.markedForDeletion);
     }
-    handleXpCollection() {
+
+    processDamage(damage) {
+        this.stats.hp -= Math.max(1, damage-this.stats.defense/2);
+    }
+
+    handlePickupCollection() {
         this.xpOrbs.forEach(orb => {
             const dist = orb.getDistance(this.player);
             if (dist < 150) { // Magnet range
-                const moveX = (this.player.x - orb.x) * 0.1;
-                const moveY = (this.player.y - orb.y) * 0.1;
+                const moveX = (this.player.centerX() - orb.centerX()) * 0.1;
+                const moveY = (this.player.centerY() - orb.centerY()) * 0.1;
                 orb.x += moveX;
                 orb.y += moveY;
             }
@@ -349,7 +399,25 @@ export default class Game {
                 this.levelUpSystem.addXP(1); // Use LevelUp system
             }
         });
+
+        this.HeartPickups.forEach(heart => {
+            const dist = heart.getDistance(this.player);
+            if (dist < 150) { // Magnet range
+                const moveX = (this.player.centerX() - heart.centerX()) * 0.1;
+                const moveY = (this.player.centerY() - heart.centerY()) * 0.1;
+                heart.x += moveX;
+                heart.y += moveY;
+            }
+            if (this.player.collidesWith(heart)) {
+                heart.markedForDeletion = true;
+                console.log("DEBUG: Heart Collected!");
+                this.stats.hp += 10;
+                this.stats.hp = Math.min(this.stats.hp,this.stats.maxHp)
+            }
+        });
+
         this.xpOrbs = this.xpOrbs.filter(o => !o.markedForDeletion);
+        this.HeartPickups = this.HeartPickups.filter(o => !o.markedForDeletion);
     }
 
     // levelUp() {
@@ -388,6 +456,9 @@ export default class Game {
     }
 
     draw(timestamp) {
+
+        {
+            this.lastDrawTime = timestamp;
         this.ctx.clearRect(0, 0, this.width, this.height);
         this.drawBackground();
 
@@ -405,7 +476,10 @@ export default class Game {
             return;
         }
 
-        const renderList = [this.player, ...this.enemies, ...this.xpOrbs, ...this.projectiles];
+        const renderList = [this.player,
+            this.slash,
+            ...this.enemies, ...this.xpOrbs, ...this.HeartPickups, ...this.projectiles];
+        this.slash.updateDirection()
         renderList.sort((a, b) => (a.y + a.frameHeight) - (b.y + b.frameHeight));
 
         renderList.forEach(obj => {
@@ -415,13 +489,13 @@ export default class Game {
 
             // Optimization: Only draw if visible on screen (Culling)
             // Add a buffer (e.g., 100px) so sprites don't pop out at edges
-            if (
+            if (obj.isRotated===true||(
                 screenX + obj.frameWidth > -100 &&
                 screenX < this.width + 100 &&
                 screenY + obj.frameHeight > -100 &&
-                screenY < this.height + 100
+                screenY < this.height + 100)
             ) {
-                obj.draw(this.ctx, Math.floor(this.gameFrame / 4), screenX, screenY);
+                obj.draw(this.ctx, this.gameFrame, screenX, screenY);
             }
         });
 
@@ -438,6 +512,7 @@ export default class Game {
         // Draw level up menu if active
         if (this.levelUpSystem.isLevelingUp) {
             this.levelUpSystem.drawLevelUpMenu(this.ctx, this.width, this.height);
+        }
         }
     }
 
@@ -727,7 +802,6 @@ export default class Game {
 
     // --- FIX: Pass timestamp to draw() so the UI timer works ---
     this.draw(timestamp);
-
     requestAnimationFrame(this.animate);
     }
 }

@@ -9,12 +9,13 @@ export default class Camera {
     update(target) {
         // Center the camera on the target (the player)
         // target.x is top-left, so add half width/height to get center
-        const targetCenterX = target.x + (target.frameWidth / 2);
-        const targetCenterY = target.y + (target.frameHeight / 2);
-
-        this.x = targetCenterX - this.width / 2;
-        this.y = targetCenterY - this.height / 2;
-        
+        // const targetCenterX = target.x + (target.frameWidth / 2);
+        // const targetCenterY = target.y + (target.frameHeight / 2);
+        //
+        // this.x = targetCenterX - this.width / 2;
+        // this.y = targetCenterY - this.height / 2;
+        this.x = target.centerX() - this.width / 2;
+        this.y = target.centerY() - this.height / 2;
 
     }
 }

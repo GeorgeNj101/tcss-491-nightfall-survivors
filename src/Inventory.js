@@ -80,6 +80,59 @@ export default class Inventory {
         }
     }
 
+		drawInventory() {
+			const ctx = this.game.ctx;
+			const canvas = this.game.canvas;
+	
+			const margin = 20;
+			const slotSize = 50;
+			const spacing = 10;
+	
+			const totalWidth = this.maxSlots * slotSize + (this.maxSlots - 1) * spacing;
+			const totalHeight = slotSize;
+	
+			// Bottom-left anchored position
+			const startX = margin;
+			const startY = canvas.height - totalHeight - margin;
+	
+			// --- Background box ---
+			ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+			ctx.fillRect(
+					startX - 10,
+					startY - 10,
+					totalWidth + 20,
+					totalHeight + 20
+			);
+	
+			// --- Draw slots ---
+			for (let i = 0; i < this.maxSlots; i++) {
+					const x = startX + i * (slotSize + spacing);
+					const y = startY;
+	
+					ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+					ctx.fillRect(x, y, slotSize, slotSize);
+	
+					ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+					ctx.strokeRect(x, y, slotSize, slotSize);
+	
+					// Draw item if exists
+					const item = this.inventory[i];
+					if (item && item.image && item.image.complete) {
+
+							let cardX = item.frameWidth
+							let cardFrame = this.game.gameFrame%item.frame
+							ctx.drawImage(
+									item.image,
+									cardX*cardFrame,
+									0,
+									cardX,
+									item.image.height,
+									x + 5,
+									y + 5,
+									slotSize - 10,
+									slotSize - 10
+							);
+					}
     drawInventory() {
         const ctx = this.game.ctx;
         const canvas = this.game.canvas;
