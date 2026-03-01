@@ -310,34 +310,6 @@ export default class Game {
                 const enemy = this.enemies[j];
                 if (enemy.markedForDeletion) continue;
                 if (p.collidesWith(enemy)) {
-                    if ( enemy.hp >  100) {
-                        const dmg = 50;
-                        enemy.hp -= dmg;
-                        p.markedForDeletion = true;
-                        if (enemy.hp <= 0) {
-                            enemy.markedForDeletion = true;
-                            for (let k = 0; k < 8; k++) {
-                                this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
-                                if(Math.random() < 1/3) {
-                                    this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
-                                }
-                            }
-                            this.score += 250;
-                        }
-                    } else {
-                        const dmg = 50;
-                        enemy.hp -= dmg;
-                        p.markedForDeletion = true;
-                        if (enemy.hp <= 0) {
-                            enemy.markedForDeletion = true;
-                            for (let k = 0; k < 1; k++) {
-                                this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
-                                if(Math.random() < 1/3) {
-                                    this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
-                                }
-                            }
-                            this.score += 10;
-                        }
                     const dmg = p.damage || 10;
                     enemy.hp -= dmg;
                     p.markedForDeletion = true;
@@ -348,6 +320,9 @@ export default class Game {
                         const orbCount = isBoss ? 8 : 1;
                         for (let k = 0; k < orbCount; k++) {
                             this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                            if (Math.random() < 1/3) {
+                                this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                            }
                         }
                         this.score += isBoss ? 250 : 10;
                     }
@@ -360,14 +335,11 @@ export default class Game {
         this.enemies.forEach(enemy => {
             enemy.update(this.player.x, this.player.y, this);
             if (this.player.collidesWith(enemy)) {
-                if ( enemy.hp > 100) {
-                    if (this.stats.hp > 0) this.processDamage(20)
-                   
                 const isBoss = enemy.maxHp > 100;
                 if (isBoss) {
-                    if (this.stats.hp > 0) this.stats.hp -= 0.05; // slow tick damage
+                    if (this.stats.hp > 0) this.processDamage(0.05);
                 } else {
-                    if (this.stats.hp > 0) this.processDamage(10)
+                    if (this.stats.hp > 0) this.processDamage(10);
                     enemy.markedForDeletion = true;
                     this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
                     this.score += 10;
