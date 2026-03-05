@@ -396,6 +396,26 @@ export default class Game {
 
         // 2. Enemy movement + player collision
         this.enemies.forEach(enemy => {
+
+            if (this.slash.collidesWith(enemy) && !enemy.markedForDeletion) {
+                enemy.lastMeleeHit = this.gameFrame
+                const dmg = this.slash.damage;
+                enemy.hp -= dmg;
+
+                if (enemy.hp <= 0) {
+                    enemy.markedForDeletion = true;
+                    const isBoss = enemy.maxHp > 100;
+                    const orbCount = isBoss ? 8 : 1;
+                    for (let k = 0; k < orbCount; k++) {
+                        this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                        if (Math.random() < 1 / 3) {
+                            this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                        }
+                    }
+                    this.score += isBoss ? 250 : 10;
+                }
+            }
+
             enemy.update(this.player.x, this.player.y, this);
             if (this.player.collidesWith(enemy)) {
                 const isBoss = enemy.maxHp > 100;
@@ -403,9 +423,9 @@ export default class Game {
                     if (this.stats.hp > 0) this.processDamage(30);
                 } else {
                     if (this.stats.hp > 0) this.processDamage(10);
-                    enemy.markedForDeletion = true;
-                    this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
-                    this.score += 10;
+                    // enemy.markedForDeletion = true;
+                    // this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
+                    // this.score += 10;
                 }
             }
         });

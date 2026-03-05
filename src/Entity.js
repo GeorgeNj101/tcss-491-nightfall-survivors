@@ -3,11 +3,11 @@ import Sprite from "./Sprite.js";
 export default class Entity extends Sprite {
     constructor(camera) {
 
-        if(Math.random()<0.5) {
+        if (Math.random() < 0.5) {
             super("assets/Chicken_Enemy.png", {
                 radius: 40
             });
-        }else{
+        } else {
             super("assets/Demon.png", {
                 radius: 30
             });
@@ -15,31 +15,32 @@ export default class Entity extends Sprite {
 
 
         this.spawn(camera);
-        this.speed = 2; 
+        this.speed = 2;
         this.maxHp = 20;
         this.hp = this.maxHp;
+        this.lastMeleeHit = -1
     }
 
 
     spawn(camera) {
-    const offset = 200; 
-    // Spawn relative to CAMERA position, not 0,0
-    const spawnX = camera.x + (Math.random() * (camera.width + offset * 2)) - offset;
-    const spawnY = camera.y + (Math.random() * (camera.height + offset * 2)) - offset;
+        const offset = 200;
+        // Spawn relative to CAMERA position, not 0,0
+        const spawnX = camera.x + (Math.random() * (camera.width + offset * 2)) - offset;
+        const spawnY = camera.y + (Math.random() * (camera.height + offset * 2)) - offset;
 
-    // Check if inside the CURRENT view (camera view)
-    if (
-        spawnX > camera.x && spawnX < camera.x + camera.width &&
-        spawnY > camera.y && spawnY < camera.y + camera.height
-    ) {
-    // If spawned inside screen, push it out
-        this.y = (Math.random() > 0.5) ? camera.y - offset : camera.y + camera.height + offset;
-        this.x = spawnX;
-    } else {
-        this.x = spawnX;
-        this.y = spawnY;
+        // Check if inside the CURRENT view (camera view)
+        if (
+            spawnX > camera.x && spawnX < camera.x + camera.width &&
+            spawnY > camera.y && spawnY < camera.y + camera.height
+        ) {
+            // If spawned inside screen, push it out
+            this.y = (Math.random() > 0.5) ? camera.y - offset : camera.y + camera.height + offset;
+            this.x = spawnX;
+        } else {
+            this.x = spawnX;
+            this.y = spawnY;
+        }
     }
-}
 
     update(playerX, playerY) {
         // 1. Calculate Center Points
@@ -55,7 +56,7 @@ export default class Entity extends Sprite {
         // 2. Set Direction based on angle
         // -PI/4 to PI/4 is Right (approx)
         const degrees = angle * (180 / Math.PI);
-        
+
         if (degrees > -45 && degrees <= 45) this.direction = 1;      // Right
         else if (degrees > 45 && degrees <= 135) this.direction = 0; // Down (Forward)
         else if (degrees > -135 && degrees <= -45) this.direction = 3; // Up (Backward)
@@ -71,16 +72,17 @@ export default class Entity extends Sprite {
             this.moving = false;
         }
     }
+
     draw(ctx, gameFrame, screenX, screenY) {
         super.draw(ctx, gameFrame, screenX, screenY);
 
         // 2. Draw Health Bar (Optional: Only show if damaged -> if (this.hp < this.maxHp))
         if (this.hp > 0) {
-            const barWidth = 40; 
+            const barWidth = 40;
             const barHeight = 6;
             // Center the bar above the sprite
             const barX = screenX + (this.frameWidth / 2) - (barWidth / 2);
-            const barY = screenY + 10; 
+            const barY = screenY + 10;
 
             // Background (Black)
             ctx.fillStyle = "black";
@@ -88,7 +90,7 @@ export default class Entity extends Sprite {
 
             // Foreground (Red)
             const hpPercent = Math.max(0, this.hp / this.maxHp);
-            ctx.fillStyle = "#ff4444"; 
+            ctx.fillStyle = "#ff4444";
             ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
 
             // Border
@@ -97,6 +99,7 @@ export default class Entity extends Sprite {
             ctx.strokeRect(barX, barY, barWidth, barHeight);
         }
     }
+
     // For Z-Index sorting
     getBottomY() {
         return this.y + this.frameHeight;

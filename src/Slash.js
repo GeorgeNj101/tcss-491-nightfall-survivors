@@ -21,6 +21,8 @@ export default class Slash extends Sprite {
         this.x-=this.frameWidth/2;
         this.y-=this.frameHeight/2;
         this.isRotated = true;
+        this.damage = 5;
+        this.gameFrame = 0;
     }
 
     updateDirection() {
@@ -50,6 +52,7 @@ export default class Slash extends Sprite {
 
 
     draw(ctx, gameFrame, screenX, screenY) {
+        this.gameFrame = gameFrame;
 
         this.updateDirection()
 
@@ -125,25 +128,97 @@ export default class Slash extends Sprite {
 
 
                 // Line 1
-                ctx.moveTo(CenterScreenX - (this.radius * Math.cos(-Angle/2 + SubAngle*(2-hitLocation)))/2
-                    , CenterScreenY - (this.radius * Math.sin(-Angle/2 + SubAngle*(2-hitLocation)))/2);
-                ctx.lineTo(CenterScreenX-this.radius * Math.cos(-Angle/2 + SubAngle*(2-hitLocation)),
-                    CenterScreenY-this.radius * Math.sin(-Angle/2 + SubAngle*(2-hitLocation)));
+                ctx.moveTo(CenterScreenX - (this.radius * Math.cos(
+                    -Angle / 2 + SubAngle * (2 - hitLocation)
+                )) / 2
+                    , CenterScreenY - (this.radius * Math.sin(
+                    -Angle / 2 + SubAngle * (2 - hitLocation)
+                )) / 2);
+                ctx.lineTo(CenterScreenX - this.radius * Math.cos(
+                    -Angle / 2 + SubAngle * (2 - hitLocation)
+                ),
+                    CenterScreenY - this.radius * Math.sin(
+                        -Angle / 2 + SubAngle * (2 - hitLocation)
+                    ));
                 ctx.stroke()
                 ctx.beginPath()
 
                 ctx.strokeStyle = "blue";
 
                 // Line 2
-                ctx.moveTo(CenterScreenX -(this.radius * Math.cos(Angle/2 -SubAngle*(hitLocation)))/2,
-                    CenterScreenY-(this.radius * Math.sin(Angle/2-SubAngle*(hitLocation)))/2);
-                ctx.lineTo(CenterScreenX- this.radius * Math.cos(Angle/2 -SubAngle*(hitLocation),),
-                    CenterScreenY -this.radius * Math.sin(Angle/2-SubAngle*(hitLocation)));
+                ctx.moveTo(CenterScreenX - (this.radius * Math.cos(
+                    Angle / 2 - SubAngle * (hitLocation)
+                )) / 2,
+                    CenterScreenY - (this.radius * Math.sin(
+                        Angle / 2 - SubAngle * (hitLocation)
+                    )) / 2);
+                ctx.lineTo(CenterScreenX - this.radius * Math.cos(
+                    Angle / 2 - SubAngle * (hitLocation)
+                ),
+                    CenterScreenY - this.radius * Math.sin(
+                        Angle / 2 - SubAngle * (hitLocation)
+                    ));
 
                 ctx.stroke();
             }
 
             ctx.restore()
         }
+    }
+
+    collidesWith(other) {
+        if (this.gameFrame === other.lastMeleeHit) {
+            return false;
+        }
+
+        this.updateDirection()
+
+        // 1. Get centers
+        const dx = (this.player.centerX()) - (other.centerX());
+        const dy = (this.player.centerY()) - (other.centerY());
+
+        // 2. Get distance
+        const distance = Math.hypot(dx, dy);
+
+
+        let EnemyAngle = Math.atan2(dy, dx)
+        EnemyAngle %= Math.PI * 2
+        EnemyAngle -=Math.PI
+
+
+        const HitAngle = 90 / 360 * 2 * Math.PI;
+        const SubAngle = HitAngle / 3
+
+
+        let hitLocation
+
+        //frame is Up, middle, down, middle
+        if ((this.gameFrame % this.cols) === 0) {
+            hitLocation = 0
+        } else if ((this.gameFrame % this.cols) === 2) {
+            hitLocation = 2
+        } else {
+            hitLocation = 1
+        }
+
+        let LeftAngle = -HitAngle / 2 + SubAngle * (2 - hitLocation) + this.direction
+        let RightAngle = HitAngle / 2 - SubAngle * (hitLocation) + this.direction
+
+        LeftAngle %= Math.PI * 2
+        RightAngle %= Math.PI * 2
+        LeftAngle -= Math.PI
+        RightAngle -= Math.PI
+
+        if( this.player.radius - other.radius > distance || distance > this.radius + other.radius ) {
+            return false
+        }
+
+        if(LeftAngle>RightAngle){
+            return (EnemyAngle > LeftAngle || EnemyAngle < RightAngle)
+        }
+
+
+
+        return (EnemyAngle > LeftAngle && EnemyAngle < RightAngle)
     }
 }
