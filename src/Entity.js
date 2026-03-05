@@ -16,7 +16,7 @@ export default class Entity extends Sprite {
 
         this.spawn(camera);
         this.speed = 2; 
-        this.maxHp = 100;
+        this.maxHp = 20;
         this.hp = this.maxHp;
     }
 

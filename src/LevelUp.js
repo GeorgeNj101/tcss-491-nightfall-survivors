@@ -14,8 +14,7 @@ export default class LevelUp {
         this.pendingLevelUps = 0; // Track multiple level ups at once
 
         this.LevelUpFrame = Math.floor(game.lastTime/this.game.frameTime);
-        
-        // Upgrade options (will be populated in Step 3)
+     
         this.availableUpgrades = [
             // Pistol weapon
             new ItemObject(
@@ -34,7 +33,7 @@ export default class LevelUp {
                     projectileSprite: "assets/Fireball.png"
                 }
             ),
-            // Xp Orb
+            //increased speed
             new ItemObject(
                 1,
                 this.loadImage("assets/Xp_Orb.png"),
@@ -79,6 +78,41 @@ export default class LevelUp {
                 "+1 Defense",
                 (game) => {
                     game.stats.defense++;
+                }
+            )
+            ,
+            new ItemObject(
+                6,
+                this.loadImage("assets/singlefireball.png"),
+                "passive",
+                "Fire Rate",
+                "+20% Fire Rate",
+                (game) => {
+                    game.stats.attackCooldown *= 0.8;
+                }
+            )
+            ,
+            new ItemObject(
+                6,
+                this.loadImage("assets/fireball.png"),
+                "passive",
+                "Increased projectiles",
+                "Add another 4 way projectile",
+                (game) => {
+                    game.stats.projectile += 4;
+                    
+                    // 2. Check if we've hit the cap of 12
+                    if (game.stats.projectile >= 8) {
+                        // 3. Find this specific upgrade in the pool by its name
+                        const index = this.availableUpgrades.findIndex(
+                            (upgrade) => upgrade.name === "Increased projectiles"
+                        );
+                        
+                        // 4. Remove it completely
+                        if (index !== -1) {
+                            this.availableUpgrades.splice(index, 1);
+                        }
+                    }
                 }
             )
 
@@ -424,6 +458,10 @@ export default class LevelUp {
             }
         }
         if (line) ctx.fillText(line, x, curY);
+    }
+
+    getMaxXp() {
+        return this.player.maxXp;
     }
 }
 

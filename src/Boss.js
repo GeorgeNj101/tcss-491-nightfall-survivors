@@ -13,7 +13,7 @@ export default class Boss extends Entity {
         this.radius = 60; // larger collision radius for boss
 
         // Replace the image source so Sprite's onload recalculates frames
-        this.image.src = "assets/Chicken_Enemy.png"; // Use same image for now, but can be swapped for a boss sprite sheet
+        this.image.src = "assets/Demon.png"; // Use same image for now, but can be swapped for a boss sprite sheet
 
         this.maxHp = 500;
         this.hp = this.maxHp;
@@ -106,10 +106,17 @@ export default class Boss extends Entity {
         const vx = dx / dist;
         const vy = dy / dist;
 
-        // spawn a projectile aimed at player
-        const proj = new Projectile(cx, cy, vx, vy);
-        // mark as enemy projectile (optional flag)
-        proj.fromEnemy = true;
-        game.projectiles.push(proj);
+        const bossAttackStats = {
+            damage: 15,                 
+            projectileSpeed: 400,       
+            projectileSprite: "assets/Shuriken.png",
+            cols: 6, // Add this based on your shuriken image layout
+            rows: 1, // Add this based on your shuriken image layout
+            fromEnemy: true,
+            range: 10000
+        };
+        console.log("Boss shoots a projectile towards the player!");
+        game.projectiles.push( new Projectile(cx, cy, vx, vy, bossAttackStats)
+        );
     }
 }

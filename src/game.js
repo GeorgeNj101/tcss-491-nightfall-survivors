@@ -37,10 +37,11 @@ export default class Game {
 
         //FOR CHEATS/DEBUGGING
         this.cheatLocked = false;
+        this.cheatLockedWave = false;
 
         // --- Invincibility Frames ---
         this.lastDamageTime = 0;
-        this.invincibilityDuration = 2000; // milliseconds
+        this.invincibilityDuration = 1000; // milliseconds
 
         // --- Player Stats ---
         this.player = new Sprite("assets/Main_Character.png");
@@ -59,7 +60,8 @@ export default class Game {
             attackCooldown: 180,
             attackTimer: 0,
             hpRegen : 0,
-            defense : 0
+            defense : 0,
+            projectile : 4
         };
 
         // --- Wave Logic ---
@@ -73,10 +75,18 @@ export default class Game {
         // --- World ---
         this.tileOffsetX = 0;
         this.tileOffsetY = 0;
-        this.tileSize = 64;
+        this.tileSize = 200;
         this.grassImage = new Image();
         this.grassImage.src = "assets/Grass.png";
-
+        //more images homoe screen
+        this.titleBackgroundImage = new Image();
+        this.titleBackgroundImage.src = "assets/Title.png";
+        this.startImage = new Image();
+        this.startImage.src = "assets/start.png";
+        this.howtoplayimage = new Image();
+        this.howtoplayimage.src = "assets/howtoplay.png";
+        this.creditsimage = new Image();
+        this.creditsimage.src = "assets/credits.png";
         // --- Inventory ---
         this.inventory = new Inventory(this);
 
@@ -209,22 +219,30 @@ export default class Game {
         if (this.keys["s"] || this.keys["ArrowDown"]) { dy = 1; this.player.direction = 0; }
         if (this.keys["a"] || this.keys["ArrowLeft"]) { dx = -1; this.player.direction = 2; }
         if (this.keys["d"] || this.keys["ArrowRight"]) { dx = 1; this.player.direction = 1; }
-        if (this.keys["Shift"]) {this.stats.speed = 6; console.log("DEBUG: Sprinting");}
-        if (!this.keys["Shift"]) {this.stats.speed = 4; }
         this.levelActivation = false;
        
         if (this.keys["x"]) {
             // Only run if NOT locked
             if (!this.cheatLocked) {
-                this.levelUpSystem.addXP(1);
+                this.levelUpSystem.addXP(this.levelUpSystem.getMaxXp()); // Instantly level up
                 console.log("DEBUG: Level Up (Cheat)");
                 this.cheatLocked = true; // Lock it immediately
             }
         } else {
-            // If "x" is NOT pressed, unlock it so we can press it again later
+   
             this.cheatLocked = false;
         }
-        
+
+        if (this.keys["z"]) {   
+            if(!this.cheatLockedWave) {
+                this.wave++; // Jump to wave 10
+                console.log("DEBUG: Skip Wave (Cheat)");
+                this.cheatLockedWave = true;
+            }
+        } else {
+            this.cheatLockedWave = false;
+        }
+
         // if (dx !== 0 || dy !== 0) {
         //     this.player.moving = true;
         //     const moveSpeed = this.stats.speed;
@@ -293,11 +311,42 @@ export default class Game {
             }
         }
 
-        // --- DEFAULT AUTO-FIRE (diagonal fireballs, always active) ---
-        if (this.stats.attackTimer >= this.stats.attackCooldown) {
+        //firebalal attack
+        if (this.stats.attackTimer >= this.stats.attackCooldown && this.stats.projectile === 4) {
             const directions = [
                 { x: 1, y: -1 }, { x: 1, y: 1 },
                 { x: -1, y: 1 }, { x: -1, y: -1 }
+            ];
+            directions.forEach(dir => {
+                const len = Math.hypot(dir.x, dir.y);
+                this.projectiles.push(new Projectile(spawnX, spawnY, dir.x / len, dir.y / len));
+            });
+            this.stats.attackTimer = 0;
+        } else if (this.stats.attackTimer >= this.stats.attackCooldown && this.stats.projectile === 8) {
+            const directions = [
+                { x: 1, y: 0 }, { x: -1, y: 0 },
+                { x: 0, y: 1 }, { x: 0, y: -1 },
+                { x: 1, y: -1 }, { x: 1, y: 1 },
+                { x: -1, y: 1 }, { x: -1, y: -1 }
+            ];
+            directions.forEach(dir => {
+                const len = Math.hypot(dir.x, dir.y);
+                this.projectiles.push(new Projectile(spawnX, spawnY, dir.x / len, dir.y / len));
+            });
+            this.stats.attackTimer = 0;
+        } else if (this.stats.attackTimer >= this.stats.attackCooldown && this.stats.projectile === 12) {
+            const directions = [ 
+                { x: 1, y: 0 }, { x: -1, y: 0 },
+                { x: 0, y: 1 }, { x: 0, y: -1 },
+                { x: 1, y: -1 }, { x: 1, y: 1 },
+                { x: -1, y: 1 }, { x: -1, y: -1 },
+                { x: .5, y: -0.95  }, { x: 0.95, y: -0.5 },
+                { x: 0.95, y: 0.5 }, { x: 0.5, y: 0.95 },
+                { x: -0.5, y: 0.95 }, { x: -0.95, y: 0.5 },
+                { x: -0.95, y: -0.5 }, { x: -0.5, y: -0.95 }
+                
+                
+            
             ];
             directions.forEach(dir => {
                 const len = Math.hypot(dir.x, dir.y);
@@ -310,15 +359,22 @@ export default class Game {
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const p = this.projectiles[i];
             p.update();
-
+            if (p.fromEnemy) {
+                // Enemy projectile: Check collision against the player
+                if (p.collidesWith(this.player)) {
+                    this.processDamage(p.damage || 15);
+                    p.markedForDeletion = true;
+                }
+            }else {
             for (let j = this.enemies.length - 1; j >= 0; j--) {
                 const enemy = this.enemies[j];
                 if (enemy.markedForDeletion) continue;
+                
                 if (p.collidesWith(enemy)) {
                     const dmg = p.damage || 10;
                     enemy.hp -= dmg;
                     p.markedForDeletion = true;
-
+                    
                     if (enemy.hp <= 0) {
                         enemy.markedForDeletion = true;
                         const isBoss = enemy.maxHp > 100;
@@ -333,6 +389,8 @@ export default class Game {
                     }
                     break;
                 }
+
+            }
             }
         }
 
@@ -342,7 +400,7 @@ export default class Game {
             if (this.player.collidesWith(enemy)) {
                 const isBoss = enemy.maxHp > 100;
                 if (isBoss) {
-                    if (this.stats.hp > 0) this.processDamage(0.05);
+                    if (this.stats.hp > 0) this.processDamage(30);
                 } else {
                     if (this.stats.hp > 0) this.processDamage(10);
                     enemy.markedForDeletion = true;
@@ -351,7 +409,7 @@ export default class Game {
                 }
             }
         });
-
+        
         // 3. Filter out dead objects
         this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
         this.enemies = this.enemies.filter(e => !e.markedForDeletion);
@@ -402,22 +460,7 @@ export default class Game {
         this.HeartPickups = this.HeartPickups.filter(o => !o.markedForDeletion);
     }
 
-    // levelUp() {
-    //     this.stats.level++;
-    //     this.stats.xp = 0;
-    //     this.stats.maxXp = Math.floor(this.stats.maxXp * 1.5);
-    //     this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + 20);
-    //     this.stats.maxHp += 10;
-    //     console.log("DEBUG: Level Up! Level " + this.stats.level);
-    //     if (this.stats.level % 5 === 0) {
-    //         this.stats.speed = Math.min(10, this.stats.speed + 1);
-    //         console.log("DEBUG: Speed Increased! Speed: " + this.stats.speed);
-    //     }
-    //     if (this.stats.level % 3 === 0 ){
-    //         this.stats.attackCooldown = Math.max(30, this.stats.attackCooldown - 20);
-    //         console.log("DEBUG: Attack Speed Increased! Cooldown: " + this.stats.attackCooldown);
-    //     }
-    // }
+   
 
     getNearestEnemy() {
         return this.enemies.reduce((nearest, current) => {
@@ -503,12 +546,6 @@ export default class Game {
     }
 
     drawBackground() {
-        // for (let x = -this.tileSize; x < this.width + this.tileSize; x += this.tileSize) {
-        //     for (let y = -this.tileSize; y < this.height + this.tileSize; y += this.tileSize) {
-        //         this.ctx.drawImage(this.grassImage, x + this.tileOffsetX, y + this.tileOffsetY, this.tileSize, this.tileSize);
-        //     }
-        // }
-        // If camera moves right (positive x), background must shift left
         const offsetX = -this.camera.x % this.tileSize;
         const offsetY = -this.camera.y % this.tileSize;
 
@@ -629,11 +666,11 @@ export default class Game {
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
 
-        const bw = 300, bh = 60;
+        const bw = 300, bh = 120;
         const bx = (this.width - bw) / 2;
         const startY = this.height / 2;
-        const howToPlayY = startY + 90;
-        const creditsY = howToPlayY + 90;
+        const howToPlayY = startY + 150;
+        const creditsY = howToPlayY + 150;
 
         if (this.screen === 'title') {
             // Start Button
@@ -677,46 +714,48 @@ export default class Game {
     }
 
     drawTitleScreen(timestamp) {
-        // Dim background
-        this.ctx.fillStyle = 'black';
-        this.ctx.fillRect(0, 0, this.width, this.height);
-
+        if (this.titleBackgroundImage.complete) {
+            // Stretches the image to fit the entire canvas
+            this.ctx.drawImage(this.titleBackgroundImage, 0, 0, this.width, this.height);
+            // this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; 
+            // this.ctx.fillRect(0, 0, this.width, this.height);
+        } else {
+            // Fallback to solid black if the image hasn't loaded yet
+            this.ctx.fillStyle = 'black';
+            this.ctx.fillRect(0, 0, this.width, this.height);
+        }
         // Title
-        this.ctx.fillStyle = 'red';
+       
         this.ctx.textAlign = 'center';
         this.ctx.font = '72px Arial';
-        this.ctx.fillText('Nightfall Survivors', this.width / 2, this.height / 2 - 120);
+        
 
         // Buttons
-        const bw = 300, bh = 60;
+        const bw = 300, bh = 120; // Keep these the same, they dictate your click hitboxes!
         const bx = (this.width - bw) / 2;
         const startY = this.height / 2;
-        const howToPlayY = startY + 90;
-        const creditsY = howToPlayY + 90;
+        const howToPlayY = startY + 150;
+        const creditsY = howToPlayY + 150;
 
-        // Start Button
-        this.ctx.fillStyle = '#007acc';
-        this.ctx.fillRect(bx, startY, bw, bh);
-        this.ctx.fillStyle = 'white';
-        this.ctx.font = '28px Arial';
-        this.ctx.fillText('Start Game', this.width / 2, startY + 40);
+        // Draw Start Button Image
+        if (this.startImage.complete) {
+            this.ctx.drawImage(this.startImage, bx, startY, bw, bh);
+         
+        }
 
-        // Controls Button
-        this.ctx.fillStyle = '#444';
-        this.ctx.fillRect(bx, howToPlayY, bw, bh);
-        this.ctx.fillStyle = 'white';
-        this.ctx.fillText('How to Play', this.width / 2, howToPlayY + 40);
+        // Draw Controls Button Image
+        if (this.howtoplayimage.complete) {
+            this.ctx.drawImage(this.howtoplayimage, bx, howToPlayY, bw, bh);
+           
+        }
 
-        // Credits Button
-        this.ctx.fillStyle = '#444';
-        this.ctx.fillRect(bx, creditsY, bw, bh);
-        this.ctx.fillStyle = 'white';
-        this.ctx.fillText('Credits', this.width / 2, creditsY + 40);
+        // Draw Credits Button Image
+        if (this.creditsimage.complete) {
+            this.ctx.drawImage(this.creditsimage, bx, creditsY, bw, bh);
+          
+        }
 
-        // Small hint
-        this.ctx.font = '16px Arial';
-        this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        this.ctx.fillText('Click a button to begin', this.width / 2, creditsY + 110);
+
     }
 
     drawControlsScreen() {
