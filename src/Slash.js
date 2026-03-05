@@ -22,7 +22,6 @@ export default class Slash extends Sprite {
         this.y-=this.frameHeight/2;
         this.isRotated = true;
         this.damage = 5;
-        this.gameFrame = 0;
     }
 
     updateDirection() {

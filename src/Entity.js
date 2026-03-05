@@ -19,6 +19,7 @@ export default class Entity extends Sprite {
         this.maxHp = 20;
         this.hp = this.maxHp;
         this.lastMeleeHit = -1
+        this.knocked = -1;
     }
 
 
@@ -63,6 +64,11 @@ export default class Entity extends Sprite {
         else this.direction = 2;                                     // Left
 
         // 3. Move towards player
+
+        if (this.knocked >= this.gameFrame ){
+            this.speed *= -1;
+        }
+
         const dist = Math.hypot(dx, dy);
         if (dist > 1) {
             this.x += (dx / dist) * this.speed;
@@ -71,9 +77,14 @@ export default class Entity extends Sprite {
         } else {
             this.moving = false;
         }
+
+        if (this.knocked >= this.gameFrame){
+            this.speed /= -1;
+        }
     }
 
     draw(ctx, gameFrame, screenX, screenY) {
+        this.gameFrame = gameFrame;
         super.draw(ctx, gameFrame, screenX, screenY);
 
         // 2. Draw Health Bar (Optional: Only show if damaged -> if (this.hp < this.maxHp))

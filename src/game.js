@@ -401,6 +401,9 @@ export default class Game {
                 enemy.lastMeleeHit = this.gameFrame
                 const dmg = this.slash.damage;
                 enemy.hp -= dmg;
+                if(enemy.maxHp <= 100) {
+                    enemy.knocked = this.gameFrame + 1;
+                }
 
                 if (enemy.hp <= 0) {
                     enemy.markedForDeletion = true;
