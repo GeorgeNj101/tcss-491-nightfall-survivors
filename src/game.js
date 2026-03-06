@@ -1,13 +1,16 @@
-import Sprite from "./Sprite.js";
-import Entity from "./Entity.js";
+import Sprite from "./enemies/Sprite.js";
+import Entity from "./enemies/Entity.js";
 import XpOrb from "./XpOrb.js";
-import Projectile from "./Projectile.js";
-import Boss from "./Boss.js";
+import Projectile from "./weapons/Projectile.js";
+import Boss from "./enemies/Boss.js";
 import Camera from "./Camera.js";
 import LevelUp from "./LevelUp.js";
 import Inventory from "./Inventory.js";
 import HeartPickup from "./HeartPickup.js";
-import Slash from "./Slash.js";
+import Slash from "./weapons/Slash.js";
+import ChickenEnemy from "./enemies/ChickenEnemy.js";
+import DemonEnemy from "./enemies/DemonEnemy.js";
+import FastChickenEnemy from "./enemies/FastChickenEnemy.js";
 
 export default class Game {
     constructor(canvas) {
@@ -49,10 +52,10 @@ export default class Game {
         this.player.y = this.height / 2 - 64;
         this.slash = new Slash(this.player);
         this.camera = new Camera(this.width, this.height);
-
+        this.playerTrail = [];
         this.stats = {
-            hp: 100,
-            maxHp: 100,
+            hp: 10000,
+            maxHp: 10000,
             xp: 0,
             maxXp: 5,//changed temperoarily for testing
             level: 1,
@@ -61,12 +64,16 @@ export default class Game {
             attackTimer: 0,
             hpRegen : 0,
             defense : 0,
-            projectile : 4
+            projectile : 4,
+            stamina: 100,      
+            maxStamina: 100,   
+            isSprinting: false,
         };
 
         // --- Wave Logic ---
         this.wave = 1;
         this.waveEnemies = 5;
+        this.waveBosses = 0;
         this.waveTimer = 60; // seconds
         this.waveStartTime = 0;
         this.waveEnemiesSpawned = false;
@@ -105,16 +112,20 @@ export default class Game {
 
     init() {
         window.addEventListener("keydown", e => {
-            this.keys[e.key] = true;
+            // Force the key to lowercase so 'W' and 'w' are treated the same
+            this.keys[e.key.toLowerCase()] = true; 
+            
             if ((this.isDead || this.isVictory) && e.key.toLowerCase() === 'r') location.reload();
 
-            // Handle SPACE key to close level up menu
             if (e.key === " " && this.levelUpSystem && this.levelUpSystem.isLevelingUp) {
                 this.levelUpSystem.closeLevelUpMenu();
-                e.preventDefault(); // Prevent page scroll
+                e.preventDefault(); 
             }
         });
-        window.addEventListener("keyup", e => this.keys[e.key] = false);
+        
+        window.addEventListener("keyup", e => {
+            this.keys[e.key.toLowerCase()] = false;
+        });
 
         // Mouse tracking — use window-level events so it works while keys are held
         window.addEventListener("mousemove", e => {
@@ -190,8 +201,23 @@ export default class Game {
         // Spawn Wave
         if (!this.waveEnemiesSpawned) {
             for (let i = 0; i < this.waveEnemies; i++) {
-                this.enemies.push(new Entity(this.camera));
+                if (Math.random() < 0.3) {
+                    this.enemies.push(new ChickenEnemy(this.camera));
+                } else if (Math.random() < 0.9) {
+                    this.enemies.push(new FastChickenEnemy(this.camera));
+                } else {
+                    this.enemies.push(new DemonEnemy(this.camera));
+                }
             }
+            if(this.wave > 2 && this.wave % 2 == 1 && !this.bossSpawned){
+                for(let i = 0; i < this.waveBosses; i++){
+                    this.enemies.push(new Boss(this.camera));
+                    console.log("Spawning Boss for wave " + this.wave);
+                }
+            }
+
+            this.waveBosses += 1;
+            this.bossSpawned = true;
             this.waveEnemiesSpawned = true;
         }
 
@@ -199,26 +225,62 @@ export default class Game {
         const waveElapsed = (timestamp - this.waveStartTime) / 1000;
         if (waveElapsed >= this.waveTimer || (this.enemies.length === 0 && this.waveEnemiesSpawned)) {
             this.wave++;
-            this.waveEnemies += 2;
+            this.waveEnemies += 2 * this.wave; // Increase enemies per wave
             this.waveTimer = Math.max(30, this.waveTimer - 5);
             this.waveStartTime = timestamp;
             this.waveEnemiesSpawned = false;
         }
 
         // Spawn a boss after 10 waves have been completed
+        // Spawn a boss after 10 waves have been completed
         if (this.wave > 2 && !this.bossSpawned) {
-            console.log("Spawning Boss: wave > 1");
+            console.log("Spawning Boss");
             this.enemies.push(new Boss(this.camera));
             this.bossSpawned = true;
         }
+         
     }
 
     handleMovement() {
         let dx = 0, dy = 0;
-        if (this.keys["w"] || this.keys["ArrowUp"]) { dy = -1; this.player.direction = 3; }
-        if (this.keys["s"] || this.keys["ArrowDown"]) { dy = 1; this.player.direction = 0; }
-        if (this.keys["a"] || this.keys["ArrowLeft"]) { dx = -1; this.player.direction = 2; }
-        if (this.keys["d"] || this.keys["ArrowRight"]) { dx = 1; this.player.direction = 1; }
+        if (this.keys["w"] || this.keys["arrowUp"]) { dy = -1; this.player.direction = 3; }
+        if (this.keys["s"] || this.keys["arrowDown"]) { dy = 1; this.player.direction = 0; }
+        if (this.keys["a"] || this.keys["arrowLeft"]) { dx = -1; this.player.direction = 2; }
+        if (this.keys["d"] || this.keys["arrowRight"]) { dx = 1; this.player.direction = 1; }
+        // --- NEW SPRINT LOGIC ---
+        this.stats.isSprinting = false;
+        const isMoving = dx !== 0 || dy !== 0;
+
+        if (this.keys["shift"] && this.stats.stamina > 0 && isMoving) {
+            this.stats.speed = 7; // Double speed!
+            this.stats.stamina -= 1; // Drain stamina
+            this.stats.isSprinting = true;
+            
+            // Record position for the ghost trail every few frames
+            if (this.gameFrame % 2 === 0) {
+                this.playerTrail.push({
+                    x: this.player.x,
+                    y: this.player.y,
+                    direction: this.player.direction,
+                    frame: this.gameFrame,
+                    alpha: 0.6 // Starting opacity of the ghost
+                });
+            }
+        } else {
+            this.stats.speed = 4; // Normal speed
+            // Regenerate stamina if not sprinting
+            if (this.stats.stamina < this.stats.maxStamina) {
+                this.stats.stamina += 0.9; 
+            }
+        }
+
+        // Update and fade old trail pieces
+        for (let i = this.playerTrail.length - 1; i >= 0; i--) {
+            this.playerTrail[i].alpha -= 0.05; // Fade out
+            if (this.playerTrail[i].alpha <= 0) {
+                this.playerTrail.splice(i, 1); // Remove invisible ghosts
+            }
+        }
         this.levelActivation = false;
        
         if (this.keys["x"]) {
@@ -398,7 +460,7 @@ export default class Game {
         this.enemies.forEach(enemy => {
             enemy.update(this.player.x, this.player.y, this);
             if (this.player.collidesWith(enemy)) {
-                const isBoss = enemy.maxHp > 100;
+                const isBoss = enemy.maxHp >= 100;
                 if (isBoss) {
                     if (this.stats.hp > 0) this.processDamage(30);
                 } else {
@@ -543,6 +605,33 @@ export default class Game {
             this.levelUpSystem.drawLevelUpMenu(this.ctx, this.width, this.height);
         }
         }
+        this.playerTrail.forEach(trail => {
+            const screenX = trail.x - this.camera.x;
+            const screenY = trail.y - this.camera.y;
+            
+            // Only draw if on screen (culling)
+            if (screenX + this.player.frameWidth > -100 && screenX < this.width + 100 &&
+                screenY + this.player.frameHeight > -100 && screenY < this.height + 100) {
+                
+                this.ctx.save();
+                this.ctx.globalAlpha = trail.alpha; // Apply fade effect
+                
+                // Calculate the exact sprite frame the player was in
+                const row = trail.direction * 2 + 1; // +1 because they were moving
+                const col = trail.frame % this.player.cols;
+                
+                this.ctx.drawImage(
+                    this.player.image,
+                    col * this.player.frameWidth, row * this.player.frameHeight,
+                    this.player.frameWidth, this.player.frameHeight,
+                    screenX, screenY,
+                    this.player.frameWidth, this.player.frameHeight
+                );
+                
+                this.ctx.restore();
+            }
+        });
+        
     }
 
     drawBackground() {
@@ -567,11 +656,21 @@ export default class Game {
     drawUI(timestamp) {
         const ctx = this.ctx;
         // Bars
-        this.drawBar(20, 20, 200, 20, this.stats.hp / this.stats.maxHp, "red", `${Math.floor(this.stats.hp)}/${this.stats.maxHp}`);
+        // Inside game.js -> drawUI()
 
+
+        this.drawBar(20, 20, 400, 40, this.stats.hp / this.stats.maxHp, "#740707", "#ef0000", `HP: ${Math.floor(this.stats.hp)} / ${this.stats.maxHp}`);
         // Use LevelUp system for XP bar
-        this.levelUpSystem.drawXPBar(ctx, 20, 50, 200, 20);
+        this.levelUpSystem.drawXPBar(this.ctx, 20, 80,400, 40, this.stats.hp / this.stats.maxHp, "#ff4b1f", "#ff9068", `HP: ${Math.floor(this.stats.hp)} / ${this.stats.maxHp}`);
         
+        const stamWidth = 500;
+        const stamHeight = 50;
+        const marginX = 40;
+        const marginY = 40;
+        const stamX = this.width - stamWidth - marginX;
+        const stamY = this.height - stamHeight - marginY;
+
+        this.drawStaminaBar(ctx, stamX, stamY, stamWidth, stamHeight, this.stats.stamina, this.stats.maxStamina);
         // Wave Info
         const waveElapsed = (timestamp - this.waveStartTime) / 1000;
         const waveRemaining = Math.max(0, this.waveTimer - waveElapsed);
@@ -580,31 +679,107 @@ export default class Game {
         const waveFormatted = `${waveMin}:${waveSec.toString().padStart(2, '0')}`;
 
         ctx.fillStyle = "white";
-        ctx.font = "24px Arial";
+        ctx.font = "40px arcadeclassic";
 
         ctx.textAlign = "left";
-        ctx.fillText(`Time: ${Math.floor(this.elapsedTime / 60)}:${(this.elapsedTime % 60).toString().padStart(2, '0')}`, 240, 40);
-        ctx.textAlign = "left";
-        ctx.fillText(`Level: ${this.stats.level}`, 240, 70);
+        ctx.fillText(`Time: ${Math.floor(this.elapsedTime / 60)}:${(this.elapsedTime % 60).toString().padStart(2, '0')}`, 450, 50);
+  
         
         
         ctx.textAlign = "right";
         ctx.fillText(`Wave: ${this.wave}`, this.width - 20, 40);
-        ctx.fillText(`Wave Timer: ${waveFormatted}`, this.width - 20, 70);
-        ctx.fillText(`Enemies: ${this.enemies.length}`, this.width - 20, 100);
+        ctx.fillText(`Wave Timer: ${waveFormatted}`, this.width - 20, 80);
+        ctx.fillText(`Enemies: ${this.enemies.length}`, this.width - 20, 120);
     }
+    drawStaminaBar(ctx, x, y, width, height, current, max) {
+        const percent = Math.max(0, current) / max;
 
-    drawBar(x, y, w, h, percent, color, label) {
-        this.ctx.fillStyle = "#333";
-        this.ctx.fillRect(x, y, w, h);
-        this.ctx.fillStyle = color;
-        this.ctx.fillRect(x, y, w * percent, h);
-        this.ctx.strokeStyle = "white";
-        this.ctx.strokeRect(x, y, w, h);
-        this.ctx.fillStyle = "white";
-        this.ctx.font = "14px Arial";
+        ctx.save();
+        ctx.fillStyle = "rgba(10, 10, 20, 0.7)";
+        ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 2;
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, 12); // 8px border radius
+        ctx.fill();
+
+        // Turn off shadow for the inner fill so it doesn't look muddy
+        ctx.shadowBlur = 0; 
+        ctx.shadowOffsetY = 0;
+
+        // 2. Draw Gradient Fill (Cyan to Deep Blue)
+        if (percent > 0) {
+            const gradient = ctx.createLinearGradient(x, y, x + width, y);
+            gradient.addColorStop(0, "#f4d289"); // Bright Cyan
+            gradient.addColorStop(1, "#ffb700"); // Electric Blue
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.roundRect(x, y, width * percent, height, 8);
+            ctx.fill();
+        }
+
+        // 3. Draw Outer Border
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, 8);
+        ctx.stroke();
+
+        // 4. Draw Crisp Text Label above the bar
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.font = "bold 30px Arial";
+        ctx.textAlign = "right";
+        ctx.fillText("STAMINA", x + width, y - 8);
+
+        ctx.restore();
+    }
+    drawBar(x, y, width, height, percent, colorStart, colorEnd, label) {
+        this.ctx.save();
+
+        // 1. Draw Background (Dark translucent glass)
+        this.ctx.fillStyle = "rgba(10, 10, 20, 0.7)";
+        this.ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+        this.ctx.shadowBlur = 8;
+        this.ctx.shadowOffsetY = 2;
+        this.ctx.beginPath();
+        this.ctx.roundRect(x, y, width, height, 8);
+        this.ctx.fill();
+
+        this.ctx.shadowBlur = 0; 
+        this.ctx.shadowOffsetY = 0;
+
+        // 2. Draw Gradient Fill
+        if (percent > 0) {
+            const gradient = this.ctx.createLinearGradient(x, y, x + width, y);
+            gradient.addColorStop(0, colorStart);
+            gradient.addColorStop(1, colorEnd);
+
+            this.ctx.fillStyle = gradient;
+            this.ctx.beginPath();
+            this.ctx.roundRect(x, y, width * percent, height, 8);
+            this.ctx.fill();
+        }
+
+        // 3. Draw Outer Border
+        this.ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+        this.ctx.lineWidth = 1.5;
+        this.ctx.beginPath();
+        this.ctx.roundRect(x, y, width, height, 8);
+        this.ctx.stroke();
+
+        // 4. Draw Centered Text Label
+        this.ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        this.ctx.font = "bold 20px Arial";
         this.ctx.textAlign = "center";
-        this.ctx.fillText(label, x + w / 2, y + h - 5);
+        this.ctx.textBaseline = "middle";
+        
+        // Add a subtle text shadow so the white text is readable over bright gradients
+        this.ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+        this.ctx.shadowBlur = 4;
+        this.ctx.fillText(label, x + width / 2, y + height / 2 + 1);
+
+        this.ctx.restore();
     }
 
     drawCrosshair() {

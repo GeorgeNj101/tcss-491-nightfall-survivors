@@ -1,5 +1,5 @@
 import Entity from "./Entity.js";
-import Projectile from "./Projectile.js";
+import Projectile from "../weapons/Projectile.js";
 
 export default class Boss extends Entity {
     constructor(camera) {
@@ -15,7 +15,7 @@ export default class Boss extends Entity {
         // Replace the image source so Sprite's onload recalculates frames
         this.image.src = "assets/Demon.png"; // Use same image for now, but can be swapped for a boss sprite sheet
 
-        this.maxHp = 500;
+        this.maxHp = 100;
         this.hp = this.maxHp;
 
         // Boss is faster than normal enemies

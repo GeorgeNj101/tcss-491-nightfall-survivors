@@ -35,7 +35,7 @@ export default class Sprite {
         this.radius = config.radius || (this.frameWidth / 2.5); 
         
         // see hitboxes
-        this.showHitbox = true;
+        this.showHitbox = false;
     }
 
    

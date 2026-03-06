@@ -6,9 +6,9 @@ export default class Inventory {
         this.equippedIndex = -1; // Index of currently equipped weapon
 
         // Slot layout (cached for click detection)
-        this.margin = 20;
-        this.slotSize = 50;
-        this.spacing = 10;
+        this.margin = 40;
+        this.slotSize = 80;
+        this.spacing = 20;
     }
 
     addItem(itemObject) {

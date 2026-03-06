@@ -280,29 +280,53 @@ export default class LevelUp {
      * @param {number} height - Bar height
      */
     drawXPBar(ctx, x, y, width, height) {
-        // Background
-        ctx.fillStyle = "#000055";
-        ctx.fillRect(x, y, width, height);
+        const percent = Math.max(0, this.player.xp) / Math.max(1, this.player.maxXP);
         
-        // XP progress
-        const xpPercent = this.player.xp / this.player.maxXP;
-        ctx.fillStyle = "blue";
-        ctx.fillRect(x, y, width * xpPercent, height);
+        ctx.save();
         
-        // Border
-        ctx.strokeStyle = "black";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, width, height);
-        
-        // Text
-        ctx.fillStyle = "white";
-        ctx.font = "20px Arial";
+        // 1. Background (Dark translucent glass)
+        ctx.fillStyle = "rgba(10, 10, 20, 0.7)";
+        ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 2;
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, 8);
+        ctx.fill();
+
+        ctx.shadowBlur = 0; 
+        ctx.shadowOffsetY = 0;
+
+        // 2. Gradient Fill (Neon Purple to Deep Blue)
+        if (percent > 0) {
+            const gradient = ctx.createLinearGradient(x, y, x + width, y);
+            gradient.addColorStop(0, "#8E2DE2"); // Vibrant Purple
+            gradient.addColorStop(1, "#4A00E0"); // Deep Blue
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.roundRect(x, y, width * percent, height, 8);
+            ctx.fill();
+        }
+
+        // 3. Outer Border
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, 8);
+        ctx.stroke();
+
+        // 4. Centered Text Label
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.font = "bold 20px Arial";
         ctx.textAlign = "center";
-        ctx.fillText(
-            `Level ${this.player.level} - XP: ${Math.floor(this.player.xp)} / ${this.player.maxXP}`,
-            x + width / 2,
-            y + height - 4
-        );
+        ctx.textBaseline = "middle";
+        
+        // Text shadow for readability
+        ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+        ctx.shadowBlur = 4;
+        ctx.fillText(`LVL ${this.player.level} - XP: ${Math.floor(this.player.xp)} / ${this.player.maxXP}`, x + width / 2, y + height / 2 + 1);
+
+        ctx.restore();
     }
     
     /**

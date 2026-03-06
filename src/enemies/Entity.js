@@ -1,23 +1,18 @@
 import Sprite from "./Sprite.js";
 
 export default class Entity extends Sprite {
-    constructor(camera) {
+    constructor(camera, config = {}) {
+        // Pass the image path and sprite dimensions up to Sprite.js
+        super(config.imagePath || "assets/Demon.png", config);
 
-        if(Math.random()<0.5) {
-            super("assets/Chicken_Enemy.png", {
-                radius: 40
-            });
-        }else{
-            super("assets/Demon.png", {
-                radius: 30
-            });
-        }
-
+        // Setup stats based on the passed config, with fallback defaults
+        this.speed = config.speed || 2; 
+        this.maxHp = config.maxHp || 20;
+        this.hp = this.maxHp;
+        this.damage = config.damage || 10;
+        this.xpValue = config.xpValue || 1; // Good to have for different enemy tiers
 
         this.spawn(camera);
-        this.speed = 2; 
-        this.maxHp = 20;
-        this.hp = this.maxHp;
     }
 
 

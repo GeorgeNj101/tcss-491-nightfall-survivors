@@ -1,4 +1,4 @@
-import Sprite from "./Sprite.js";
+import Sprite from "../enemies/Sprite.js";
 
 export default class Projectile extends Sprite {
     constructor(x, y, dx, dy, weaponStats = null) {
@@ -7,14 +7,14 @@ export default class Projectile extends Sprite {
         // Dynamically get cols/rows from stats, or default to 4x4 (for the Fireball)
         const cols = (weaponStats && weaponStats.cols) || 4;
         const rows = (weaponStats && weaponStats.rows) || 4;
-
-        super(sprite, { x, y, cols: cols, rows: rows, radius: 20});
+        const radius = (weaponStats && weaponStats.radius) || 20;
+        super(sprite, { x, y, cols: cols, rows: rows, radius: radius });
 
         this.vx = dx;
         this.vy = dy;
         this.damage = (weaponStats && weaponStats.damage) || 10;
         this.speed = (weaponStats && weaponStats.projectileSpeed) ? weaponStats.projectileSpeed / 60 : 8;
-        this.size = 64;
+        this.size = (weaponStats && weaponStats.size) || 64; // Default size for drawing
 
         this.timer = 0;
         this.maxTime = (weaponStats && weaponStats.range) ? Math.ceil(weaponStats.range / (this.speed || 1)) : 200;

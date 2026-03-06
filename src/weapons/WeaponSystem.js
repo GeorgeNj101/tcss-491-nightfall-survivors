@@ -18,7 +18,7 @@ export default class WeaponSystem {
 
         const speed = stats.projectileSpeed || 500;
         const damage = stats.damage || 5;
-        const range = stats.range || 400;
+        const range = stats.range || 500;
         const sprite = stats.projectileSprite || "assets/Shuriken.png";
 
         // Normalize direction
