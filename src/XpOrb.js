@@ -1,4 +1,4 @@
-import Sprite from "./Sprite.js";
+import Sprite from "./enemies/Sprite.js";
 
 export default class XpOrb extends Sprite {
     constructor(x, y) {

@@ -11,79 +11,75 @@ export default class LevelUp {
         
         // Level up state
         this.isLevelingUp = false;
+        this.waveLevelUp = false;
         this.pendingLevelUps = 0; // Track multiple level ups at once
 
         this.LevelUpFrame = Math.floor(game.lastTime/this.game.frameTime);
-        
-        // Upgrade options (will be populated in Step 3)
+     
         this.availableUpgrades = [
             // Pistol weapon
             new ItemObject(
-                1,
-                this.loadImage("assets/pistol.png"),
-                "weapon",
-                "Pistol",
-                "Slow but reliable sidearm. Click inventory to equip.",
-                null, // No auto-effect — player must click inventory to equip
+                1, this.loadImage("assets/pistol.png"), "weapon", "Pistol", "Slow but reliable sidearm. Click inventory to equip.",
+                (game) => { }, // Auto-removal handles the splicing now!
                 {
-                    damage: 15,
-                    fireRate: 1.5,        // 1.5 shots per second (slow)
-                    projectileSpeed: 480, // px/sec
-                    range: 400,           // px
-                    spread: 0,
-                    projectileSprite: "assets/Fireball.png"
+                    damage: 15, fireRate: 2, projectileSpeed: 480, range: 800, spread: 0,
+                    projectileSprite: "assets/Shuriken.png", cols: 6, rows: 1, size:30, radius: 15,
+                    currentLevel: 0, maxLevel: 1 
                 }
             ),
-            // Xp Orb
+            // Sprint
             new ItemObject(
-                1,
-                this.loadImage("assets/Xp_Orb.png"),
-                "passive",
-                "Sprint",
-                "+1 Speed",
+                1, this.loadImage("assets/sprint.png"), "passive", "Sprint", "Increased maximum stamina.",
                 (game) => {
-                    game.stats.speed += 1;
-                }
+                    game.stats.maxStamina += 50; 
+                    game.stats.stamina += 50; 
+                    game.stats.staminaRegen += 0.2;
+                },
+                { currentLevel: 0, maxLevel: 3 }
             ),
-            //HP Regen
+            // HP Regen
             new ItemObject(
-                4,
-                this.loadImage("assets/Regen.png"),
-                "passive",
-                "Health Regen",
-                "+1 Health Regeneration",
-                (game) => {
-                    game.stats.hpRegen += 1/30;
-                }
+                4, this.loadImage("assets/Regen.png"), "passive", "Health Regen", "+1 Health Regeneration",
+                (game) => { game.stats.hpRegen += 1/100; },
+                { currentLevel: 0, maxLevel: 2 }
             ),
-
-            //Max HP
+            // Max HP
             new ItemObject(
-                4,
-                this.loadImage("assets/Max Health.png"),
-                "passive",
-                "Max Hp",
-                "+10 Maximum Health",
+                4, this.loadImage("assets/Max Health.png"), "passive", "Max Hp", "+10 Maximum Health",
                 (game) => {
-                    game.stats.maxHp += 10;
-                    game.stats.hp += 10;
-                }
+                    game.stats.maxHp += 30;
+                    game.stats.hp += 30;
+                },
+                { currentLevel: 0, maxLevel: 5 }
             ),
-
-            //Max HP
+            // Fire Rate
             new ItemObject(
-                6,
-                this.loadImage("assets/Shield.png"),
-                "passive",
-                "Defense",
-                "+1 Defense",
+                6, this.loadImage("assets/singlefireball.png"), "passive", "Fire Rate", "Reduces attack cooldown.",
                 (game) => {
-                    game.stats.defense++;
-                }
+                    game.stats.attackCooldown -= 40;
+                    console.log("Attack cooldown is now: " + game.stats.attackCooldown);
+                },
+                { currentLevel: 0, maxLevel: 4 } // 180 -> 140 -> 100 -> 60
+            ),
+            // Increased projectiles
+            new ItemObject(
+                6, this.loadImage("assets/fireball.png"), "passive", "Increased Projectiles", "Adds 4 more projectiles.",
+                (game) => { game.stats.projectile += 4; },
+                { currentLevel: 0, maxLevel: 2 } // Starts at 4 -> 8 -> 12
+            ),
+            // Damage Up
+            new ItemObject(
+                1, this.loadImage("assets/damageincrease.png"), "passive", "Damage Up", "Increases damage multiplier.",
+                (game) => {
+                    game.stats.damageMultiplier *= 1.25;
+                    console.log("Damage multiplier is now: " + game.stats.damageMultiplier);
+                },
+                { currentLevel: 0, maxLevel: 5} 
             )
-
         ];
-        
+
+        this.selectedUpgrades = []; // Player's inventory
+        this.currentChoices = [];
 
         this.selectedUpgrades = []; // Player's inventory
         this.currentChoices = [];    // Upgrades offered this level up
@@ -106,7 +102,7 @@ export default class LevelUp {
      * Level 5→6: 50 XP
      */
     getXPForNextLevel(level) {
-        return Math.floor(10 * Math.pow(1.5, level - 1));
+        return Math.floor(3 + Math.pow(2, level - 1));
     }
     
     /**
@@ -135,7 +131,7 @@ export default class LevelUp {
         }
         
         // If we have pending level ups, trigger the level up menu
-        if (this.pendingLevelUps > 0 && !this.isLevelingUp) {
+        if (this.pendingLevelUps > 0 && !this.isLevelingUp && !this.game.isWaveTransitioning) {
             this.triggerLevelUpMenu();
         }
     }
@@ -171,6 +167,19 @@ export default class LevelUp {
 
         console.log("Level up menu triggered! Choose an upgrade or press SPACE to skip.");
     }
+     triggerWaveLevelUpMenu() {
+        this.waveLevelUp = true;
+        this.currentChoices = this.generateChoices();
+        this.hoveredIndex = -1;
+
+        // Pause the game and track pause start time
+        if (this.game) {
+            this.game.gamePaused = true;
+            this.game.pauseStartTime = performance.now();
+        }
+
+        console.log("wave power up menu triggered! Choose an upgrade or press SPACE to skip.");
+    }
     
     /**
      * Select an upgrade (Step 5)
@@ -178,14 +187,24 @@ export default class LevelUp {
      */
     selectUpgrade(upgrade) {
         this.selectedUpgrades.push(upgrade);
-        this.pendingLevelUps--;
         
         // Apply upgrade effect
         this.applyUpgrade(upgrade);
-        
-        // If no more pending level ups, close menu
-        if (this.pendingLevelUps <= 0) {
+
+        if (this.waveLevelUp) {
+            // If it was a wave-completion powerup, close it immediately
             this.closeLevelUpMenu();
+        } else {
+
+            this.pendingLevelUps--;
+            
+            if (this.pendingLevelUps <= 0) {
+                this.closeLevelUpMenu();
+            } else {
+                // Generate NEW choices for the next pending level up!
+                this.currentChoices = this.generateChoices();
+                //this.hoveredIndex = -1;
+            }
         }
     }
     
@@ -198,9 +217,25 @@ export default class LevelUp {
         if (typeof upgrade.effect === 'function') {
             upgrade.effect(this.game);
         }
-
+        // Handle max level logic for stackable upgrades
+        if (!upgrade.stats) upgrade.stats = {};
+        if (upgrade.stats.maxLevel) {
+            // Increment the level
+            upgrade.stats.currentLevel = (upgrade.stats.currentLevel || 0) + 1;
+            
+            // If it reached max level, permanently remove it from the pool!
+            if (upgrade.stats.currentLevel >= upgrade.stats.maxLevel) {
+                const index = this.availableUpgrades.findIndex(u => u.name === upgrade.name);
+                if (index !== -1) {
+                    this.availableUpgrades.splice(index, 1);
+                }
+            }
+        }
         // Add to inventory (weapons persist, consumables also show)
-        this.game.inventory.addItem(upgrade);
+        if(upgrade.type === "weapon" || upgrade.type === "consumable") {
+            this.game.inventory.addItem(upgrade);
+        }
+        
 
         // If it's a weapon and we don't have a current weapon, equip it
         if (upgrade.type === "weapon" && !this.game.currentWeapon) {
@@ -224,14 +259,18 @@ export default class LevelUp {
      */
     closeLevelUpMenu() {
         this.isLevelingUp = false;
+        this.waveLevelUp = false;
         this.pendingLevelUps = 0;
         this.LevelUpFrame = 0
+
 
         if (this.game) {
             const pauseDuration = performance.now() - this.game.pauseStartTime;
             this.game.totalPauseTime += pauseDuration;
             this.game.waveStartTime += pauseDuration;
-            this.game.gamePaused = false;
+            //if (!this.game.isWaveTransitioning) {
+                this.game.gamePaused = false;
+            //}
         }
 
         console.log("Level up menu closed. Game resumed.");
@@ -246,29 +285,53 @@ export default class LevelUp {
      * @param {number} height - Bar height
      */
     drawXPBar(ctx, x, y, width, height) {
-        // Background
-        ctx.fillStyle = "#000055";
-        ctx.fillRect(x, y, width, height);
+        const percent = Math.max(0, this.player.xp) / Math.max(1, this.player.maxXP);
         
-        // XP progress
-        const xpPercent = this.player.xp / this.player.maxXP;
-        ctx.fillStyle = "blue";
-        ctx.fillRect(x, y, width * xpPercent, height);
+        ctx.save();
         
-        // Border
-        ctx.strokeStyle = "black";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, width, height);
-        
-        // Text
-        ctx.fillStyle = "white";
-        ctx.font = "20px Arial";
+        // 1. Background (Dark translucent glass)
+        ctx.fillStyle = "rgba(10, 10, 20, 0.7)";
+        ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 2;
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, 8);
+        ctx.fill();
+
+        ctx.shadowBlur = 0; 
+        ctx.shadowOffsetY = 0;
+
+        // 2. Gradient Fill (Neon Purple to Deep Blue)
+        if (percent > 0) {
+            const gradient = ctx.createLinearGradient(x, y, x + width, y);
+            gradient.addColorStop(0, "#8E2DE2"); // Vibrant Purple
+            gradient.addColorStop(1, "#4A00E0"); // Deep Blue
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.roundRect(x, y, width * percent, height, 8);
+            ctx.fill();
+        }
+
+        // 3. Outer Border
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, 8);
+        ctx.stroke();
+
+        // 4. Centered Text Label
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.font = "bold 20px Arial";
         ctx.textAlign = "center";
-        ctx.fillText(
-            `Level ${this.player.level} - XP: ${Math.floor(this.player.xp)} / ${this.player.maxXP}`,
-            x + width / 2,
-            y + height - 4
-        );
+        ctx.textBaseline = "middle";
+        
+        // Text shadow for readability
+        ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+        ctx.shadowBlur = 4;
+        ctx.fillText(`LVL ${this.player.level} - XP: ${Math.floor(this.player.xp)} / ${this.player.maxXP}`, x + width / 2, y + height / 2 + 1);
+
+        ctx.restore();
     }
     
     /**
@@ -291,8 +354,8 @@ export default class LevelUp {
     /**
      * Handle mouse click on upgrade cards
      */
-    handleClick(mx, my) {
-        if (!this.isLevelingUp) return;
+    handleClick(mx, my, isOn) {
+        if (!isOn) return;
         const canvasWidth = this.game.canvas.width;
         for (let i = 0; i < this.currentChoices.length; i++) {
             const r = this.getCardRect(i, canvasWidth);
@@ -354,6 +417,57 @@ export default class LevelUp {
         ctx.textAlign = "center";
         ctx.fillText("Click a card to choose  |  SPACE to skip", canvasWidth / 2, canvasHeight - 60);
     }
+    drawWaveLevelUpMenu(ctx, canvasWidth, canvasHeight) {
+        // Update hover state from mouse position
+        this.hoveredIndex = -1;
+        if (this.game.mouse) {
+            const mx = this.game.mouse.x;
+            const my = this.game.mouse.y;
+            for (let i = 0; i < this.currentChoices.length; i++) {
+                const r = this.getCardRect(i, canvasWidth);
+                if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
+                    this.hoveredIndex = i;
+                    break;
+                }
+            }
+        }
+
+        // Darker semi-transparent overlay
+        ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        // Title with glow effect
+        ctx.shadowColor = "gold";
+        ctx.shadowBlur = 20;
+        ctx.fillStyle = "gold";
+        ctx.font = "bold 72px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Wave Power Up!", canvasWidth / 2, 150);
+        ctx.shadowBlur = 0;
+
+        // Level info
+        ctx.fillStyle = "white";
+        ctx.font = "36px Arial";
+        ctx.fillText(`Wave ${this.game.getWave()} completed`, canvasWidth / 2, 230);
+
+        // Pending level ups indicator
+        if (this.pendingLevelUps > 1) {
+            ctx.font = "24px Arial";
+            ctx.fillStyle = "yellow";
+            ctx.fillText(`(${this.pendingLevelUps} level ups pending)`, canvasWidth / 2, 270);
+        }
+
+        // Draw upgrade cards
+        for (let i = 0; i < this.currentChoices.length; i++) {
+            this.drawCard(ctx, i, canvasWidth);
+        }
+
+        // Instructions
+        ctx.fillStyle = "#aaa";
+        ctx.font = "20px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Click a card to choose  |  SPACE to skip", canvasWidth / 2, canvasHeight - 60);
+    }
 
     /**
      * Draw a single upgrade card
@@ -363,11 +477,9 @@ export default class LevelUp {
         const r = this.getCardRect(index, canvasWidth);
         const hovered = index === this.hoveredIndex;
 
-        // Card background
         ctx.fillStyle = hovered ? "rgba(255, 255, 255, 0.18)" : "rgba(255, 255, 255, 0.08)";
         ctx.fillRect(r.x, r.y, r.w, r.h);
 
-        // Card border (color by type)
         const borderColor = upgrade.type === "weapon" ? "rgba(255, 100, 100, 0.9)"
                           : upgrade.type === "passive" ? "rgba(100, 200, 255, 0.9)"
                           : "rgba(100, 255, 100, 0.9)";
@@ -375,7 +487,6 @@ export default class LevelUp {
         ctx.lineWidth = hovered ? 3 : 2;
         ctx.strokeRect(r.x, r.y, r.w, r.h);
 
-        // Icon (centered, 64x64)
         const iconSize = 64;
         const iconX = r.x + (r.w - iconSize) / 2;
         const iconY = r.y + 25;
@@ -388,24 +499,39 @@ export default class LevelUp {
             ctx.fillRect(iconX, iconY, iconSize, iconSize);
         }
 
-        // Name
         ctx.fillStyle = "white";
         ctx.font = "bold 20px Arial";
         ctx.textAlign = "center";
         ctx.fillText(upgrade.name, r.x + r.w / 2, iconY + iconSize + 30);
 
-        // Type tag
         ctx.font = "14px Arial";
         ctx.fillStyle = borderColor;
         ctx.fillText(`[${upgrade.type.toUpperCase()}]`, r.x + r.w / 2, iconY + iconSize + 50);
 
-        // Description (word-wrap in card)
+        // --- NEW: Draw Level Progression Text ---
+        if (upgrade.stats && upgrade.stats.maxLevel) {
+            // Display what level they are ABOUT to get if they click this card
+            const nextLevel = (upgrade.stats.currentLevel || 0) + 1;
+            const max = upgrade.stats.maxLevel;
+            
+            ctx.font = "bold 14px Arial";
+            if (nextLevel === max) {
+                ctx.fillStyle = "gold";
+                ctx.fillText(`Level ${nextLevel} (MAX)`, r.x + r.w / 2, iconY + iconSize + 70);
+            } else {
+                ctx.fillStyle = "#00f2fe"; // Cyan
+                ctx.fillText(`Level ${nextLevel} / ${max}`, r.x + r.w / 2, iconY + iconSize + 70);
+            }
+        }
+
+        // Shift description down so it doesn't overlap the new level text
+        const descY = (upgrade.stats && upgrade.stats.maxLevel) ? iconY + iconSize + 95 : iconY + iconSize + 75;
+        
         ctx.fillStyle = "#ccc";
         ctx.font = "14px Arial";
-        this.drawWrappedText(ctx, upgrade.description, r.x + r.w / 2, iconY + iconSize + 72, r.w - 20, 18);
+        this.drawWrappedText(ctx, upgrade.description, r.x + r.w / 2, descY, r.w - 20, 18);
         this.LevelUpFrame=Math.floor(this.game.lastTime/this.game.frameTime);
     }
-
     /**
      * Simple word-wrap text drawing
      */
@@ -424,6 +550,10 @@ export default class LevelUp {
             }
         }
         if (line) ctx.fillText(line, x, curY);
+    }
+
+    getMaxXp() {
+        return this.player.maxXp;
     }
 }
 
