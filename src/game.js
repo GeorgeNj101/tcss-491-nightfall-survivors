@@ -178,10 +178,6 @@ export default class Game {
 
         if (this.isWaveTransitioning) {
             
-            
-            
-            
-            // 2. Freeze the 5-second countdown clock while the level-up menu is open
             if (this.levelUpSystem.waveLevelUp) {
                 this.waveTransitionStartTime = timestamp;
                 return; // Skip everything else until they choose a card
@@ -198,6 +194,11 @@ export default class Game {
                 // Reset timers for the fresh wave
                 this.waveStartTime = timestamp;
                 this.lastSecondTime = timestamp;
+                
+                //Check if any level ups were blocked during the transition 
+                if (this.levelUpSystem.pendingLevelUps > 0) {
+                    this.levelUpSystem.triggerLevelUpMenu();
+                }
             }
             
             //return; // Skip normal combat/movement updates during the transition
@@ -216,7 +217,7 @@ export default class Game {
                 this.stats.hp = 0;
             }
         }
-        console.log(this.levelUpSystem.waveLevelUp)
+        console.log(this.isWaveTransitioning)
     }
 
     updateTimers(timestamp) {
@@ -241,7 +242,7 @@ export default class Game {
                     this.enemies.push(new DemonEnemy(this.camera));
                 }
             }
-            if(this.wave > 2 && !this.bossSpawned){
+            if(this.wave > 2 && !this.bossSpawned && !this.isWaveTransitioning){
                 for(let i = 0; i < this.waveBosses; i++){
                     this.bosses.push(new Boss(this.camera));
                     console.log("Spawning Boss for wave " + this.wave);
@@ -1106,5 +1107,9 @@ export default class Game {
         this.ctx.fillText("YOU WIN!", this.width / 2, this.height / 2 - 40);
         this.ctx.font = "30px Arial";
         this.ctx.fillText(`Survived ${this.elapsedTime}s - Press R to Restart`, this.width / 2, this.height / 2 + 40);
+    }
+
+    getWave() {
+        return this.wave;   
     }
 }

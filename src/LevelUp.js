@@ -24,15 +24,28 @@ export default class LevelUp {
                 "weapon",
                 "Pistol",
                 "Slow but reliable sidearm. Click inventory to equip.",
-                null, // No auto-effect — player must click inventory to equip
+                (game) => {
+                    const index = this.availableUpgrades.findIndex(
+                            (upgrade) => upgrade.name === "Pistol"
+                        );
+         
+                        if (index !== -1) {
+                            this.availableUpgrades.splice(index, 1);
+                        }
+                }, // No auto-effect — player must click inventory to equip
                 {
                     damage: 15,
-                    fireRate: 1.5,        // 1.5 shots per second (slow)
-                    projectileSpeed: 480, // px/sec
-                    range: 400,           // px
+                    fireRate: 2,        
+                    projectileSpeed: 480, 
+                    range: 800,           
                     spread: 0,
-                    projectileSprite: "assets/Fireball.png"
-                }
+                    projectileSprite: "assets/Shuriken.png",
+                    cols: 6,
+                    rows: 1, 
+                    size:30,
+                    radius: 15,
+                },
+                
             ),
             //increased speed
             new ItemObject(
@@ -53,7 +66,7 @@ export default class LevelUp {
                 "Health Regen",
                 "+1 Health Regeneration",
                 (game) => {
-                    game.stats.hpRegen += 1/30;
+                    game.stats.hpRegen += 1/100;
                 }
             ),
 
@@ -101,8 +114,7 @@ export default class LevelUp {
                 "Add another 4 way projectile",
                 (game) => {
                     game.stats.projectile += 4;
-                    
-                    // 2. Check if we've hit the cap of 12
+        
                     if (game.stats.projectile >= 8) {
                         // 3. Find this specific upgrade in the pool by its name
                         const index = this.availableUpgrades.findIndex(
@@ -115,7 +127,20 @@ export default class LevelUp {
                         }
                     }
                 }
+            ),
+
+            new ItemObject(
+                1,
+                this.loadImage("assets/damageincrease.png"),
+                "passive",
+                "Damage Up",
+                "+20% Damage",
+                (game) => {
+                    game.stats.damage *= 3;
+                }
             )
+
+
 
         ];
         
@@ -141,7 +166,7 @@ export default class LevelUp {
      * Level 5→6: 50 XP
      */
     getXPForNextLevel(level) {
-        return Math.floor(10 * Math.pow(1.5, level - 1));
+        return Math.floor(3 + level * 2);
     }
     
     /**
@@ -170,7 +195,7 @@ export default class LevelUp {
         }
         
         // If we have pending level ups, trigger the level up menu
-        if (this.pendingLevelUps > 0 && !this.isLevelingUp) {
+        if (this.pendingLevelUps > 0 && !this.isLevelingUp && !this.game.isWaveTransitioning) {
             this.triggerLevelUpMenu();
         }
     }
@@ -459,7 +484,7 @@ export default class LevelUp {
         // Level info
         ctx.fillStyle = "white";
         ctx.font = "36px Arial";
-        ctx.fillText(`Wave ${this.player.wave} completed!`, canvasWidth / 2, 230);
+        ctx.fillText(`Wave ${this.game.getWave()} completed`, canvasWidth / 2, 230);
 
         // Pending level ups indicator
         if (this.pendingLevelUps > 1) {
