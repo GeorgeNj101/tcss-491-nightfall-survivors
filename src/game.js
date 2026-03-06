@@ -21,6 +21,7 @@ export default class Game {
 
         this.keys = {};
         this.enemies = [];
+        this.bosses = [];
         this.xpOrbs = [];
         this.HeartPickups = [];
         this.projectiles = [];
@@ -78,7 +79,9 @@ export default class Game {
         this.waveStartTime = 0;
         this.waveEnemiesSpawned = false;
         this.bossSpawned = false;
-
+        this.isWaveTransitioning = false;
+        this.isWaveTransitioningDraw = false;
+        this.waveTransitionStartTime = 0;
         // --- World ---
         this.tileOffsetX = 0;
         this.tileOffsetY = 0;
@@ -117,7 +120,7 @@ export default class Game {
             
             if ((this.isDead || this.isVictory) && e.key.toLowerCase() === 'r') location.reload();
 
-            if (e.key === " " && this.levelUpSystem && this.levelUpSystem.isLevelingUp) {
+            if (e.key === " " && this.levelUpSystem && (this.levelUpSystem.isLevelingUp || this.levelUpSystem.waveLevelUp)) {
                 this.levelUpSystem.closeLevelUpMenu();
                 e.preventDefault(); 
             }
@@ -145,8 +148,11 @@ export default class Game {
             const my = e.clientY - rect.top;
 
             if (this.levelUpSystem && this.levelUpSystem.isLevelingUp) {
-                this.levelUpSystem.handleClick(mx, my);
-            } else {
+                this.levelUpSystem.handleClick(mx, my, this.levelUpSystem.isLevelingUp);
+            } else if (this.levelUpSystem && this.levelUpSystem.waveLevelUp) {
+                this.levelUpSystem.handleClick(mx, my, this.levelUpSystem.waveLevelUp);
+            }
+            else {
                 // Check inventory clicks
                 this.inventory.handleClick(mx, my);
             }
@@ -170,6 +176,32 @@ export default class Game {
         // Only run game updates when playing
         if (this.screen !== 'playing') return;
 
+        if (this.isWaveTransitioning) {
+            
+            
+            
+            
+            // 2. Freeze the 5-second countdown clock while the level-up menu is open
+            if (this.levelUpSystem.waveLevelUp) {
+                this.waveTransitionStartTime = timestamp;
+                return; // Skip everything else until they choose a card
+            }else {
+                this.isWaveTransitioningDraw = true;
+
+            }
+
+            // 3. Normal countdown (Menu is closed, counting down to 5 seconds)
+            if (timestamp - this.waveTransitionStartTime >= 5000) {
+                this.isWaveTransitioning = false;
+                this.gamePaused = false; // Ensure game unpauses
+                this.isWaveTransitioningDraw = false; // Stop drawing transition screen
+                // Reset timers for the fresh wave
+                this.waveStartTime = timestamp;
+                this.lastSecondTime = timestamp;
+            }
+            
+            //return; // Skip normal combat/movement updates during the transition
+        }
         // Don't update game logic if paused (level up menu)
         if (!this.gamePaused) {
             this.gameFrame = Math.floor(timestamp/this.frameTime)
@@ -184,6 +216,7 @@ export default class Game {
                 this.stats.hp = 0;
             }
         }
+        console.log(this.levelUpSystem.waveLevelUp)
     }
 
     updateTimers(timestamp) {
@@ -195,23 +228,22 @@ export default class Game {
     }
 
     handleWaveSystem(timestamp) {
-        // Pass the camera to the new Entity
         if (this.waveStartTime === 0) this.waveStartTime = timestamp;
         
         // Spawn Wave
-        if (!this.waveEnemiesSpawned) {
+        if (!this.waveEnemiesSpawned && !this.isWaveTransitioning) {
             for (let i = 0; i < this.waveEnemies; i++) {
-                if (Math.random() < 0.3) {
+                if (Math.random() < 0.4) {
                     this.enemies.push(new ChickenEnemy(this.camera));
-                } else if (Math.random() < 0.9) {
+                } else if (Math.random() > 0.9) {
                     this.enemies.push(new FastChickenEnemy(this.camera));
                 } else {
                     this.enemies.push(new DemonEnemy(this.camera));
                 }
             }
-            if(this.wave > 2 && this.wave % 2 == 1 && !this.bossSpawned){
+            if(this.wave > 2 && !this.bossSpawned){
                 for(let i = 0; i < this.waveBosses; i++){
-                    this.enemies.push(new Boss(this.camera));
+                    this.bosses.push(new Boss(this.camera));
                     console.log("Spawning Boss for wave " + this.wave);
                 }
             }
@@ -223,12 +255,17 @@ export default class Game {
 
         // Check Wave Completion
         const waveElapsed = (timestamp - this.waveStartTime) / 1000;
-        if (waveElapsed >= this.waveTimer || (this.enemies.length === 0 && this.waveEnemiesSpawned)) {
+        if (waveElapsed >= this.waveTimer || ((this.enemies.length === 0 && this.waveEnemiesSpawned) && (this.bosses.length === 0 && this.bossSpawned))) {
             this.wave++;
             this.waveEnemies += 2 * this.wave; // Increase enemies per wave
             this.waveTimer = Math.max(30, this.waveTimer - 5);
-            this.waveStartTime = timestamp;
+            this.levelUpSystem.triggerWaveLevelUpMenu();
+            this.isWaveTransitioning = true;
+            this.waveTransitionStartTime = timestamp;
             this.waveEnemiesSpawned = false;
+            this.bossSpawned = false;
+        
+           
         }
 
         // Spawn a boss after 10 waves have been completed
@@ -297,39 +334,21 @@ export default class Game {
 
         if (this.keys["z"]) {   
             if(!this.cheatLockedWave) {
-                this.wave++; // Jump to wave 10
-                console.log("DEBUG: Skip Wave (Cheat)");
+                this.enemies.forEach(enemy => {
+                enemy.markedForDeletion = true;
                 this.cheatLockedWave = true;
+            });
             }
         } else {
             this.cheatLockedWave = false;
         }
-
-        // if (dx !== 0 || dy !== 0) {
-        //     this.player.moving = true;
-        //     const moveSpeed = this.stats.speed;
-        //     this.tileOffsetX = (this.tileOffsetX + dx * moveSpeed) % this.tileSize;
-        //     this.tileOffsetY = (this.tileOffsetY + dy * moveSpeed) % this.tileSize;
-            
-        //     // Move world objects relative to player
-        //     const objects = [...this.enemies, ...this.xpOrbs, ...this.projectiles];
-        //     objects.forEach(obj => {
-        //         obj.x += dx * moveSpeed;
-        //         obj.y += dy * moveSpeed;
-        //     });
-        // } else {
-        //     this.player.moving = false;
-        // }
         if (dx !== 0 || dy !== 0) {
             this.player.moving = true;
 
-            // Normalize vector (prevent faster diagonal movement)
             const length = Math.hypot(dx, dy);
             dx /= length;
             dy /= length;
             
-
-            // Move Player in WORLD coordinates
             this.player.x += dx * this.stats.speed;
             this.player.y += dy * this.stats.speed;
 
@@ -337,9 +356,6 @@ export default class Game {
         } else {
             this.player.moving = false;
         }
-
-        // Update Camera to follow player
-        // this.camera.update(this.player);
     }
 
     handleCombat() {
@@ -463,13 +479,13 @@ export default class Game {
                 enemy.lastMeleeHit = this.gameFrame
                 const dmg = this.slash.damage;
                 enemy.hp -= dmg;
-                if(enemy.maxHp <= 100) {
+                if(enemy.maxHp >= 100) {
                     enemy.knocked = this.gameFrame + 1;
                 }
 
                 if (enemy.hp <= 0) {
                     enemy.markedForDeletion = true;
-                    const isBoss = enemy.maxHp > 100;
+                    const isBoss = enemy.maxHp >= 100;
                     const orbCount = isBoss ? 8 : 1;
                     for (let k = 0; k < orbCount; k++) {
                         this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
@@ -585,6 +601,7 @@ export default class Game {
             this.drawCreditsScreen(timestamp);
             return;
         }
+        
 
         const renderList = [this.player,
             this.slash,
@@ -613,7 +630,7 @@ export default class Game {
         this.inventory.drawInventory();
 
         // Draw crosshair when weapon equipped
-        if (this.currentWeapon && !this.isDead && !this.levelUpSystem.isLevelingUp) {
+        if (this.currentWeapon && !this.isDead && !this.levelUpSystem.isLevelingUp && !this.levelUpSystem.waveLevelUp) {
             this.drawCrosshair();
         }
 
@@ -626,6 +643,13 @@ export default class Game {
         // Draw level up menu if active
         if (this.levelUpSystem.isLevelingUp) {
             this.levelUpSystem.drawLevelUpMenu(this.ctx, this.width, this.height);
+        }
+        if(this.levelUpSystem.waveLevelUp) {
+            this.levelUpSystem.drawWaveLevelUpMenu(this.ctx, this.width, this.height);
+        }
+        if (this.isWaveTransitioningDraw) {
+           this.drawWaveTransitionScreen(timestamp);
+            
         }
         }
         this.playerTrail.forEach(trail => {
@@ -713,6 +737,7 @@ export default class Game {
         ctx.fillText(`Wave: ${this.wave}`, this.width - 20, 40);
         ctx.fillText(`Wave Timer: ${waveFormatted}`, this.width - 20, 80);
         ctx.fillText(`Enemies: ${this.enemies.length}`, this.width - 20, 120);
+        ctx.fillText(`Bosses: ${this.bosses.length}`, this.width - 20, 160);
     }
     drawStaminaBar(ctx, x, y, width, height, current, max) {
         const percent = Math.max(0, current) / max;
@@ -1014,6 +1039,49 @@ export default class Game {
         this.ctx.fillText('Back', this.width / 2, backY + 40);
     }
 
+    drawWaveTransitionScreen(timestamp) {
+        this.ctx.save();
+
+        const elapsed = timestamp - this.waveTransitionStartTime; 
+        
+        // Subtract elapsed from total pause time (5000ms), divide by 1000 for seconds, and round up
+        let remainingSeconds = Math.ceil((5000 - elapsed) / 1000); 
+        
+        // Safety clamp just in case of frame hitches
+        if (remainingSeconds < 1) remainingSeconds = 1; 
+        if (remainingSeconds > 5) remainingSeconds = 5;
+
+        // 2. Darken the background slightly so the text pops
+        this.ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+        this.ctx.fillRect(0, 0, this.width, this.height);
+
+        // 3. Draw the glowing "WAVE X" text (Shifted up slightly)
+        this.ctx.textAlign = "center";
+        this.ctx.textBaseline = "middle";
+        
+        this.ctx.shadowColor = "rgba(255, 183, 0, 0.8)"; // Golden glow
+        this.ctx.shadowBlur = 20;
+        this.ctx.fillStyle = "#ffb700"; // Golden text
+        this.ctx.font = "bold 80px arcadeclassic, Arial"; 
+        
+        this.ctx.fillText(`WAVE ${this.wave}`, this.width / 2, this.height / 4 - 50);
+        
+        // 4. Draw the "Get Ready..." subtitle
+        this.ctx.shadowBlur = 0; // Turn off extreme glow for the subtitle
+        this.ctx.shadowColor = "rgba(0,0,0,0.8)"; // Subtle black drop shadow
+        this.ctx.shadowBlur = 4;
+        
+        this.ctx.fillStyle = "white";
+        this.ctx.font = "30px arcadeclassic, Arial";
+        this.ctx.fillText("Get Ready...", this.width / 2, this.height / 4 + 20);
+
+        // 5. Draw the large visual countdown
+        this.ctx.fillStyle = "#00f2fe"; // Bright Cyan to match your stamina bar
+        this.ctx.font = "bold 70px arcadeclassic, Arial";
+        this.ctx.fillText(remainingSeconds.toString(), this.width / 2, this.height / 4 + 90);
+
+        this.ctx.restore();
+    }
     animate(timestamp) {
        // Handle first frame edge case
     if (!this.lastTime) this.lastTime = timestamp;

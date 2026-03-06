@@ -11,6 +11,7 @@ export default class LevelUp {
         
         // Level up state
         this.isLevelingUp = false;
+        this.waveLevelUp = false;
         this.pendingLevelUps = 0; // Track multiple level ups at once
 
         this.LevelUpFrame = Math.floor(game.lastTime/this.game.frameTime);
@@ -205,6 +206,19 @@ export default class LevelUp {
 
         console.log("Level up menu triggered! Choose an upgrade or press SPACE to skip.");
     }
+     triggerWaveLevelUpMenu() {
+        this.waveLevelUp = true;
+        this.currentChoices = this.generateChoices();
+        this.hoveredIndex = -1;
+
+        // Pause the game and track pause start time
+        if (this.game) {
+            this.game.gamePaused = true;
+            this.game.pauseStartTime = performance.now();
+        }
+
+        console.log("wave power up menu triggered! Choose an upgrade or press SPACE to skip.");
+    }
     
     /**
      * Select an upgrade (Step 5)
@@ -258,8 +272,10 @@ export default class LevelUp {
      */
     closeLevelUpMenu() {
         this.isLevelingUp = false;
+        this.waveLevelUp = false;
         this.pendingLevelUps = 0;
         this.LevelUpFrame = 0
+
 
         if (this.game) {
             const pauseDuration = performance.now() - this.game.pauseStartTime;
@@ -349,8 +365,8 @@ export default class LevelUp {
     /**
      * Handle mouse click on upgrade cards
      */
-    handleClick(mx, my) {
-        if (!this.isLevelingUp) return;
+    handleClick(mx, my, isOn) {
+        if (!isOn) return;
         const canvasWidth = this.game.canvas.width;
         for (let i = 0; i < this.currentChoices.length; i++) {
             const r = this.getCardRect(i, canvasWidth);
@@ -393,6 +409,57 @@ export default class LevelUp {
         ctx.fillStyle = "white";
         ctx.font = "36px Arial";
         ctx.fillText(`Level ${this.player.level}`, canvasWidth / 2, 230);
+
+        // Pending level ups indicator
+        if (this.pendingLevelUps > 1) {
+            ctx.font = "24px Arial";
+            ctx.fillStyle = "yellow";
+            ctx.fillText(`(${this.pendingLevelUps} level ups pending)`, canvasWidth / 2, 270);
+        }
+
+        // Draw upgrade cards
+        for (let i = 0; i < this.currentChoices.length; i++) {
+            this.drawCard(ctx, i, canvasWidth);
+        }
+
+        // Instructions
+        ctx.fillStyle = "#aaa";
+        ctx.font = "20px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Click a card to choose  |  SPACE to skip", canvasWidth / 2, canvasHeight - 60);
+    }
+    drawWaveLevelUpMenu(ctx, canvasWidth, canvasHeight) {
+        // Update hover state from mouse position
+        this.hoveredIndex = -1;
+        if (this.game.mouse) {
+            const mx = this.game.mouse.x;
+            const my = this.game.mouse.y;
+            for (let i = 0; i < this.currentChoices.length; i++) {
+                const r = this.getCardRect(i, canvasWidth);
+                if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
+                    this.hoveredIndex = i;
+                    break;
+                }
+            }
+        }
+
+        // Darker semi-transparent overlay
+        ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        // Title with glow effect
+        ctx.shadowColor = "gold";
+        ctx.shadowBlur = 20;
+        ctx.fillStyle = "gold";
+        ctx.font = "bold 72px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Wave Power Up!", canvasWidth / 2, 150);
+        ctx.shadowBlur = 0;
+
+        // Level info
+        ctx.fillStyle = "white";
+        ctx.font = "36px Arial";
+        ctx.fillText(`Wave ${this.player.wave} completed!`, canvasWidth / 2, 230);
 
         // Pending level ups indicator
         if (this.pendingLevelUps > 1) {
