@@ -54,6 +54,8 @@ export default class Game {
         this.slash = new Slash(this.player);
         this.camera = new Camera(this.width, this.height);
         this.playerTrail = [];
+        this.player.kbX = 0; 
+        this.player.kbY = 0;
         this.stats = {
             hp: 100,
             maxHp: 100,
@@ -71,6 +73,7 @@ export default class Game {
             sprintCooldown: false,  
             isSprinting: false,
             damageMultiplier: 1
+            
         };
 
         // --- Wave Logic ---
@@ -326,7 +329,7 @@ export default class Game {
         if (this.keys["x"]) {
             // Only run if NOT locked
             if (!this.cheatLocked) {
-                this.levelUpSystem.addXP(this.levelUpSystem.getMaxXp()); // Instantly level up
+                this.levelUpSystem.addXP(Math.floor(3 + Math.pow(2, this.stats.level - 1))); // Instantly level up
                 console.log("DEBUG: Level Up (Cheat)");
                 this.cheatLocked = true; // Lock it immediately
             }
@@ -339,8 +342,13 @@ export default class Game {
             if(!this.cheatLockedWave) {
                 this.enemies.forEach(enemy => {
                 enemy.markedForDeletion = true;
-                this.cheatLockedWave = true;
+        
             });
+                this.bosses.forEach(boss => {
+                boss.markedForDeletion = true;
+              
+            });
+                this.cheatLockedWave = true;
             }
         } else {
             this.cheatLockedWave = false;
@@ -359,6 +367,20 @@ export default class Game {
         } else {
             this.player.moving = false;
         }
+
+        this.player.x += this.player.kbX;
+        this.player.y += this.player.kbY;
+
+        // Apply friction to slow the knockback down smoothly (0.85 = 15% slowdown per frame)
+        this.player.kbX *= 0.85;
+        this.player.kbY *= 0.85;
+
+        // Stop the math once the slide is basically over to prevent floating point drift
+        if (Math.abs(this.player.kbX) < 0.1) this.player.kbX = 0;
+        if (Math.abs(this.player.kbY) < 0.1) this.player.kbY = 0;
+
+        // Ensure the camera follows the player even while they are being knocked back
+        this.camera.update(this.player);
     }
 
     handleCombat() {
@@ -426,8 +448,6 @@ export default class Game {
                 { x: -0.5, y: 0.95 }, { x: -0.95, y: 0.5 },
                 { x: -0.95, y: -0.5 }, { x: -0.5, y: -0.95 }
                 
-                
-            
             ];
             directions.forEach(dir => {
                 const len = Math.hypot(dir.x, dir.y);
@@ -461,11 +481,9 @@ export default class Game {
                     if (enemy.hp <= 0) {
                         enemy.markedForDeletion = true;
                         let orbCount = 0;
-                        const isBoss = enemy.maxHp == 100;
                         const isDemon = enemy.maxHp == 30;
                         const isFastChicken = enemy.maxHp == 10;
                         const isChicken = enemy.maxHp == 15;
-                        
                         if(isDemon) {
                             orbCount = 3;
                         }
@@ -474,7 +492,34 @@ export default class Game {
                         }
                         else if(isChicken) {
                             orbCount = 1;
-                        }else if(isBoss) {
+                        }
+                        for (let k = 0; k < orbCount; k++) {
+                            this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                            if (Math.random() < 1/3) {
+                                this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                            }
+                        }
+                    }
+                    break;
+                }
+
+            }
+            //boss collisions
+            for (let j = this.bosses.length - 1; j >= 0; j--) {
+                const enemy = this.bosses[j];
+                if (enemy.markedForDeletion) continue;
+                
+                if (p.collidesWith(enemy)) {
+                    const dmg = p.damage * this.stats.damageMultiplier || 8;
+                    console.log(`DEBUG: Projectile hit boss for ${dmg} damage!`);
+                    console.log(this.stats.damageMultiplier);
+                    enemy.hp -= dmg;
+                    p.markedForDeletion = true;
+                    if (enemy.hp <= 0) {
+                        enemy.markedForDeletion = true;
+                        let orbCount = 0;
+                        const isDemonBoss = enemy.maxHp == 100;
+                        if(isDemonBoss) {
                             orbCount = 15;
                         }
                         for (let k = 0; k < orbCount; k++) {
@@ -483,7 +528,6 @@ export default class Game {
                                 this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
                             }
                         }
-                        this.score += isBoss ? 250 : 10;
                     }
                     break;
                 }
@@ -494,46 +538,49 @@ export default class Game {
 
         // 2. Enemy movement + player collision
         this.enemies.forEach(enemy => {
-
             if (this.slash.collidesWith(enemy) && !enemy.markedForDeletion) {
                 enemy.lastMeleeHit = this.gameFrame
                 const dmg = this.slash.damage;
                 enemy.hp -= dmg;
-                if(enemy.maxHp >= 100) {
-                    enemy.knocked = this.gameFrame + 1;
-                }
 
                 if (enemy.hp <= 0) {
                     enemy.markedForDeletion = true;
-                    const isBoss = enemy.maxHp >= 100;
-                    const orbCount = isBoss ? 8 : 1;
+                    const orbCount = 1;
                     for (let k = 0; k < orbCount; k++) {
                         this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
                         if (Math.random() < 1 / 3) {
                             this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
                         }
                     }
-                    this.score += isBoss ? 250 : 10;
                 }
             }
-
             enemy.update(this.player.x, this.player.y, this);
             if (this.player.collidesWith(enemy)) {
-                const isBoss = enemy.maxHp >= 100;
-                if (isBoss) {
-                    if (this.stats.hp > 0) this.processDamage(30);
-                } else {
-                    if (this.stats.hp > 0) this.processDamage(10);
-                     enemy.markedForDeletion = true;
-                    // this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
-                    // this.score += 10;
-                }
+                     enemy.markedForDeletion = true; 
+                     this.processDamage(enemy.damage || 10);  
+            }
+        });
+        this.bosses.forEach(enemy => {
+            
+            enemy.update(this.player.x, this.player.y, this);
+            if (this.player.collidesWith(enemy)) {
+                        const dx = this.player.centerX() - enemy.centerX();
+                        const dy = this.player.centerY() - enemy.centerY();
+                        const dist = Math.hypot(dx, dy) || 1;
+                        
+                        // Set an initial velocity instead of teleporting
+                        // (15 is a good number because it will multiply across several frames)
+                        const knockbackForce = 30; 
+                        this.player.kbX = (dx / dist) * knockbackForce;
+                        this.player.kbY = (dy / dist) * knockbackForce;
+                        this.processDamage(enemy.damage|| 20);
             }
         });
         
         // 3. Filter out dead objects
         this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
         this.enemies = this.enemies.filter(e => !e.markedForDeletion);
+        this.bosses = this.bosses.filter(b => !b.markedForDeletion);
     }
 
     processDamage(damage) {
@@ -626,7 +673,7 @@ export default class Game {
 
         const renderList = [this.player,
             this.slash,
-            ...this.enemies, ...this.xpOrbs, ...this.HeartPickups, ...this.projectiles];
+            ...this.enemies, ...this.xpOrbs, ...this.HeartPickups, ...this.projectiles,...this.bosses];
         this.slash.updateDirection()
         renderList.sort((a, b) => (a.y + a.frameHeight) - (b.y + b.frameHeight));
 

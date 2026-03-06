@@ -102,7 +102,8 @@ export default class LevelUp {
                 "Fire Rate",
                 "+20% Fire Rate",
                 (game) => {
-                    game.stats.attackCooldown *= 0.8;
+                    game.stats.attackCooldown -= 0.2;
+                    console.log("Attack cooldown is now: " + game.stats.attackCooldown);
                 }
             )
             ,
@@ -134,10 +135,19 @@ export default class LevelUp {
                 this.loadImage("assets/damageincrease.png"),
                 "passive",
                 "Damage Up",
-                "+50% Damage",
+                "+20% Damage",
                 (game) => {
-                    game.stats.damageMultiplier += 1.5;
+                    
+                    game.stats.damageMultiplier *= 1.5;
                     console.log("Damage multiplier is now: " + game.stats.damageMultiplier);
+                    if(game.stats.damageMultiplier >= 3) {; 
+                        const index = this.availableUpgrades.findIndex(
+                            (upgrade) => upgrade.name === "Damage Up"
+                        );
+                        if (index !== -1) {
+                            this.availableUpgrades.splice(index, 1);
+                        }
+                    }
                 }
             )
 
@@ -167,7 +177,7 @@ export default class LevelUp {
      * Level 5→6: 50 XP
      */
     getXPForNextLevel(level) {
-        return Math.floor(3 + level * 2);
+        return Math.floor(3 + Math.pow(2, level - 1));
     }
     
     /**

@@ -20,7 +20,7 @@ export default class Boss extends Entity {
 
         // Boss is faster than normal enemies
         this.speed = 2.0;
-
+        this.damage = 30;
         // Shooting
         this.attackCooldown = 90; // frames
         this.attackTimer = 0;
