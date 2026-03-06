@@ -36,6 +36,8 @@ export default class Sprite {
         
         // see hitboxes
         this.showHitbox = false;
+
+        this.gameFrame = 0;
     }
 
    
