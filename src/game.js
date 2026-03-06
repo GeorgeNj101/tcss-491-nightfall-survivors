@@ -45,7 +45,7 @@ export default class Game {
 
         // --- Invincibility Frames ---
         this.lastDamageTime = 0;
-        this.invincibilityDuration = 1000; // milliseconds
+        this.invincibilityDuration = 500; // milliseconds
 
         // --- Player Stats ---
         this.player = new Sprite("assets/Main_Character.png");
@@ -55,8 +55,8 @@ export default class Game {
         this.camera = new Camera(this.width, this.height);
         this.playerTrail = [];
         this.stats = {
-            hp: 10000,
-            maxHp: 10000,
+            hp: 100,
+            maxHp: 100,
             xp: 0,
             maxXp: 5,//changed temperoarily for testing
             level: 1,
@@ -67,8 +67,10 @@ export default class Game {
             defense : 0,
             projectile : 4,
             stamina: 100,      
-            maxStamina: 100,   
+            maxStamina: 100, 
+            sprintCooldown: false,  
             isSprinting: false,
+            damageMultiplier: 1
         };
 
         // --- Wave Logic ---
@@ -217,7 +219,7 @@ export default class Game {
                 this.stats.hp = 0;
             }
         }
-        console.log(this.isWaveTransitioning)
+       // console.log(this.isWaveTransitioning)
     }
 
     updateTimers(timestamp) {
@@ -289,9 +291,13 @@ export default class Game {
         this.stats.isSprinting = false;
         const isMoving = dx !== 0 || dy !== 0;
 
-        if (this.keys["shift"] && this.stats.stamina > 0 && isMoving) {
+        if (this.keys["shift"] && this.stats.stamina > 0 && isMoving && !this.stats.sprintCooldown) {
+
             this.stats.speed = 7; // Double speed!
             this.stats.stamina -= 1; // Drain stamina
+            if(this.stats.stamina <= 1) {
+                this.stats.sprintCooldown = true;
+            }
             this.stats.isSprinting = true;
             
             // Record position for the ghost trail every few frames
@@ -308,7 +314,10 @@ export default class Game {
             this.stats.speed = 4; // Normal speed
             // Regenerate stamina if not sprinting
             if (this.stats.stamina < this.stats.maxStamina) {
-                this.stats.stamina += 0.9; 
+                this.stats.stamina += 0.2; 
+                if (this.stats.stamina >= 50) {
+                    this.stats.sprintCooldown = false; // Reset cooldown once stamina is sufficiently regenerated
+                }
             }
         }
 
@@ -450,14 +459,31 @@ export default class Game {
                 if (enemy.markedForDeletion) continue;
                 
                 if (p.collidesWith(enemy)) {
-                    const dmg = p.damage || 10;
+                    const dmg = p.damage * this.stats.damageMultiplier || 8;
+                    console.log(`DEBUG: Projectile hit enemy for ${dmg} damage!`);
+                    console.log(this.stats.damageMultiplier);
                     enemy.hp -= dmg;
                     p.markedForDeletion = true;
                     
                     if (enemy.hp <= 0) {
                         enemy.markedForDeletion = true;
-                        const isBoss = enemy.maxHp > 100;
-                        const orbCount = isBoss ? 8 : 1;
+                        let orbCount = 0;
+                        const isBoss = enemy.maxHp == 100;
+                        const isDemon = enemy.maxHp == 30;
+                        const isFastChicken = enemy.maxHp == 10;
+                        const isChicken = enemy.maxHp == 15;
+                        
+                        if(isDemon) {
+                            orbCount = 3;
+                        }
+                        else if(isFastChicken) {
+                            orbCount = 2;
+                        }
+                        else if(isChicken) {
+                            orbCount = 1;
+                        }else if(isBoss) {
+                            orbCount = 15;
+                        }
                         for (let k = 0; k < orbCount; k++) {
                             this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
                             if (Math.random() < 1/3) {
@@ -505,7 +531,7 @@ export default class Game {
                     if (this.stats.hp > 0) this.processDamage(30);
                 } else {
                     if (this.stats.hp > 0) this.processDamage(10);
-                    // enemy.markedForDeletion = true;
+                     enemy.markedForDeletion = true;
                     // this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
                     // this.score += 10;
                 }
@@ -521,6 +547,7 @@ export default class Game {
         const now = performance.now();
         if (now - this.lastDamageTime < this.invincibilityDuration) {
             return; // Still invincible
+            console.log("DEBUG: Damage Ignored (Invincibility Frames)");
         }
         this.lastDamageTime = now;
         this.stats.hp -= Math.max(1, damage - this.stats.defense / 2);

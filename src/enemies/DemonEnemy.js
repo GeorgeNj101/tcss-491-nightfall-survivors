@@ -6,14 +6,14 @@ export default class DemonEnemy extends Entity {
         super(camera, {
             imagePath: "assets/Demon.png",
             radius: 30,
-            maxHp: 20,   
+            maxHp: 30,   
             speed: 1.5,  
             damage: 15
         });
 
         // --- Custom Demon Stats ---
         this.shootTimer = 0;
-        this.shootCooldown = 180; // Shoots every 3 seconds (assuming 60 FPS)
+        this.shootCooldown = 380; // Shoots every 3 seconds (assuming 60 FPS)
     }
 
     // Override the default update to include shooting

@@ -47,15 +47,15 @@ export default class LevelUp {
                 },
                 
             ),
-            //increased speed
+            //increased sprint
             new ItemObject(
                 1,
-                this.loadImage("assets/Xp_Orb.png"),
+                this.loadImage("assets/sprint.png"),
                 "passive",
                 "Sprint",
-                "+1 Speed",
+                "increased stamina",
                 (game) => {
-                    game.stats.speed += 1;
+                    game.stats.stamina += 20;
                 }
             ),
             //HP Regen
@@ -83,18 +83,18 @@ export default class LevelUp {
                 }
             ),
 
-            //Max HP
-            new ItemObject(
-                6,
-                this.loadImage("assets/Shield.png"),
-                "passive",
-                "Defense",
-                "+1 Defense",
-                (game) => {
-                    game.stats.defense++;
-                }
-            )
-            ,
+
+            // new ItemObject(
+            //     6,
+            //     this.loadImage("assets/Shield.png"),
+            //     "passive",
+            //     "Defense",
+            //     "+1 Defense",
+            //     (game) => {
+            //         game.stats.defense++;
+            //     }
+            // )
+            // ,
             new ItemObject(
                 6,
                 this.loadImage("assets/singlefireball.png"),
@@ -134,9 +134,10 @@ export default class LevelUp {
                 this.loadImage("assets/damageincrease.png"),
                 "passive",
                 "Damage Up",
-                "+20% Damage",
+                "+50% Damage",
                 (game) => {
-                    game.stats.damage *= 3;
+                    game.stats.damageMultiplier += 1.5;
+                    console.log("Damage multiplier is now: " + game.stats.damageMultiplier);
                 }
             )
 
@@ -251,14 +252,24 @@ export default class LevelUp {
      */
     selectUpgrade(upgrade) {
         this.selectedUpgrades.push(upgrade);
-        this.pendingLevelUps--;
         
         // Apply upgrade effect
         this.applyUpgrade(upgrade);
-        
-        // If no more pending level ups, close menu
-        if (this.pendingLevelUps <= 0) {
+
+        if (this.waveLevelUp) {
+            // If it was a wave-completion powerup, close it immediately
             this.closeLevelUpMenu();
+        } else {
+
+            this.pendingLevelUps--;
+            
+            if (this.pendingLevelUps <= 0) {
+                this.closeLevelUpMenu();
+            } else {
+                // Generate NEW choices for the next pending level up!
+                this.currentChoices = this.generateChoices();
+                //this.hoveredIndex = -1;
+            }
         }
     }
     
