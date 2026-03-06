@@ -102,8 +102,17 @@ export default class LevelUp {
                 "Fire Rate",
                 "+20% Fire Rate",
                 (game) => {
-                    game.stats.attackCooldown -= 0.2;
+                    game.stats.attackCooldown -=40;
                     console.log("Attack cooldown is now: " + game.stats.attackCooldown);
+                    if(game.stats.attackCooldown <= 60) {
+                        const index = this.availableUpgrades.findIndex(
+                            (upgrade) => upgrade.name === "Fire Rate"
+                        );
+                        if (index !== -1) {
+                            this.availableUpgrades.splice(index, 1);
+                        }
+                    }
+
                 }
             )
             ,
