@@ -33,6 +33,7 @@ export default class LevelUp {
                 (game) => {
                     game.stats.maxStamina += 50; 
                     game.stats.stamina += 50; 
+                    game.stats.staminaRegen += 0.2;
                 },
                 { currentLevel: 0, maxLevel: 3 }
             ),
@@ -40,7 +41,7 @@ export default class LevelUp {
             new ItemObject(
                 4, this.loadImage("assets/Regen.png"), "passive", "Health Regen", "+1 Health Regeneration",
                 (game) => { game.stats.hpRegen += 1/100; },
-                { currentLevel: 0, maxLevel: 1 }
+                { currentLevel: 0, maxLevel: 2 }
             ),
             // Max HP
             new ItemObject(
@@ -58,7 +59,7 @@ export default class LevelUp {
                     game.stats.attackCooldown -= 40;
                     console.log("Attack cooldown is now: " + game.stats.attackCooldown);
                 },
-                { currentLevel: 0, maxLevel: 3 } // 180 -> 140 -> 100 -> 60
+                { currentLevel: 0, maxLevel: 4 } // 180 -> 140 -> 100 -> 60
             ),
             // Increased projectiles
             new ItemObject(
@@ -70,10 +71,10 @@ export default class LevelUp {
             new ItemObject(
                 1, this.loadImage("assets/damageincrease.png"), "passive", "Damage Up", "Increases damage multiplier.",
                 (game) => {
-                    game.stats.damageMultiplier *= 1.5;
+                    game.stats.damageMultiplier *= 1.25;
                     console.log("Damage multiplier is now: " + game.stats.damageMultiplier);
                 },
-                { currentLevel: 0, maxLevel: 3 } 
+                { currentLevel: 0, maxLevel: 5} 
             )
         ];
 

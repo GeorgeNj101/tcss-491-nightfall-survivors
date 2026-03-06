@@ -45,7 +45,7 @@ export default class Game {
 
         // --- Invincibility Frames ---
         this.lastDamageTime = 0;
-        this.invincibilityDuration = 100; // milliseconds
+        this.invincibilityDuration = 300; 
 
         // --- Player Stats ---
         this.player = new Sprite("assets/Main_Character.png");
@@ -70,6 +70,7 @@ export default class Game {
             projectile : 4,
             stamina: 100,      
             maxStamina: 100, 
+            staminaRegen: 0.2,
             sprintCooldown: false,  
             isSprinting: false,
             damageMultiplier: 1
@@ -255,7 +256,7 @@ export default class Game {
                 }
             }
             
-            this.waveBosses += 1;
+          
             this.bossSpawned = true;
             this.waveEnemiesSpawned = true;
         }
@@ -264,7 +265,8 @@ export default class Game {
         const waveElapsed = (timestamp - this.waveStartTime) / 1000;
         if (waveElapsed >= this.waveTimer || ((this.enemies.length === 0 && this.waveEnemiesSpawned) && (this.bosses.length === 0 && this.bossSpawned))) {
             this.wave++;
-            this.waveEnemies += 2 * this.wave; // Increase enemies per wave
+            this.waveEnemies += 2 * this.wave;
+            this.waveBosses = this.wave; // Increase enemies per wave
             this.waveTimer = Math.max(30, this.waveTimer - 5);
             this.levelUpSystem.triggerWaveLevelUpMenu();
             this.isWaveTransitioning = true;
@@ -310,8 +312,8 @@ export default class Game {
             this.stats.speed = 4; // Normal speed
             // Regenerate stamina if not sprinting
             if (this.stats.stamina < this.stats.maxStamina) {
-                this.stats.stamina += 0.2; 
-                if (this.stats.stamina >= 50) {
+                this.stats.stamina += this.stats.staminaRegen; 
+                if (this.stats.stamina >= 30) {
                     this.stats.sprintCooldown = false; // Reset cooldown once stamina is sufficiently regenerated
                 }
             }
@@ -495,10 +497,11 @@ export default class Game {
                         }
                         for (let k = 0; k < orbCount; k++) {
                             this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
-                            if (Math.random() < 1/3) {
+                            
+                        }
+                        if (Math.random() < 1/3) {
                                 this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
                             }
-                        }
                     }
                     break;
                 }
@@ -524,9 +527,10 @@ export default class Game {
                         }
                         for (let k = 0; k < orbCount; k++) {
                             this.xpOrbs.push(new XpOrb(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
-                            if (Math.random() < 1/3) {
+                            
+                        }
+                        if (Math.random() < 1/2) {
                                 this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
-                            }
                         }
                     }
                     break;
@@ -695,6 +699,7 @@ export default class Game {
         });
 
         this.drawUI(timestamp);
+        this.drawDamageOverlay(timestamp);
         this.inventory.drawInventory();
 
         // Draw crosshair when weapon equipped
@@ -1149,6 +1154,36 @@ export default class Game {
         this.ctx.fillText(remainingSeconds.toString(), this.width / 2, this.height / 4 + 90);
 
         this.ctx.restore();
+    }
+
+    drawDamageOverlay(timestamp) {
+        // We use performance.now() here to perfectly match how you set this.lastDamageTime
+        const now = performance.now(); 
+        const timeSinceHit = now - this.lastDamageTime;
+        
+        // Check if we are currently in the invincibility period
+        if (timeSinceHit < this.invincibilityDuration) {
+            this.ctx.save();
+            
+            // Calculate a pulsing opacity (rapid heartbeat flash)
+            // The / 60 controls the speed of the flash, and * 0.6 is the maximum opacity.
+            const alpha = Math.abs(Math.sin(now / 60)) * 0.6;
+            
+            // Create a radial gradient to fill the corners with red
+            const gradient = this.ctx.createRadialGradient(
+                this.width / 2, this.height / 2, this.height / 3,  // Inner circle (transparent)
+                this.width / 2, this.height / 2, this.width / 1.5  // Outer edge (flashing red)
+            );
+            
+            gradient.addColorStop(0, "rgba(255, 0, 0, 0)");
+            gradient.addColorStop(1, `rgba(255, 0, 0, ${alpha})`);
+            
+            // Draw the gradient over the whole screen
+            this.ctx.fillStyle = gradient;
+            this.ctx.fillRect(0, 0, this.width, this.height);
+            
+            this.ctx.restore();
+        }
     }
     animate(timestamp) {
        // Handle first frame edge case
