@@ -45,7 +45,7 @@ export default class Game {
 
         // --- Invincibility Frames ---
         this.lastDamageTime = 0;
-        this.invincibilityDuration = 500; // milliseconds
+        this.invincibilityDuration = 100; // milliseconds
 
         // --- Player Stats ---
         this.player = new Sprite("assets/Main_Character.png");

@@ -19,151 +19,66 @@ export default class LevelUp {
         this.availableUpgrades = [
             // Pistol weapon
             new ItemObject(
-                1,
-                this.loadImage("assets/pistol.png"),
-                "weapon",
-                "Pistol",
-                "Slow but reliable sidearm. Click inventory to equip.",
-                (game) => {
-                    const index = this.availableUpgrades.findIndex(
-                            (upgrade) => upgrade.name === "Pistol"
-                        );
-         
-                        if (index !== -1) {
-                            this.availableUpgrades.splice(index, 1);
-                        }
-                }, // No auto-effect — player must click inventory to equip
+                1, this.loadImage("assets/pistol.png"), "weapon", "Pistol", "Slow but reliable sidearm. Click inventory to equip.",
+                (game) => { }, // Auto-removal handles the splicing now!
                 {
-                    damage: 15,
-                    fireRate: 2,        
-                    projectileSpeed: 480, 
-                    range: 800,           
-                    spread: 0,
-                    projectileSprite: "assets/Shuriken.png",
-                    cols: 6,
-                    rows: 1, 
-                    size:30,
-                    radius: 15,
+                    damage: 15, fireRate: 2, projectileSpeed: 480, range: 800, spread: 0,
+                    projectileSprite: "assets/Shuriken.png", cols: 6, rows: 1, size:30, radius: 15,
+                    currentLevel: 0, maxLevel: 1 
+                }
+            ),
+            // Sprint
+            new ItemObject(
+                1, this.loadImage("assets/sprint.png"), "passive", "Sprint", "Increased maximum stamina.",
+                (game) => {
+                    game.stats.maxStamina += 50; 
+                    game.stats.stamina += 50; 
                 },
-                
+                { currentLevel: 0, maxLevel: 3 }
             ),
-            //increased sprint
+            // HP Regen
             new ItemObject(
-                1,
-                this.loadImage("assets/sprint.png"),
-                "passive",
-                "Sprint",
-                "increased stamina",
-                (game) => {
-                    game.stats.stamina += 20;
-                }
+                4, this.loadImage("assets/Regen.png"), "passive", "Health Regen", "+1 Health Regeneration",
+                (game) => { game.stats.hpRegen += 1/100; },
+                { currentLevel: 0, maxLevel: 1 }
             ),
-            //HP Regen
+            // Max HP
             new ItemObject(
-                4,
-                this.loadImage("assets/Regen.png"),
-                "passive",
-                "Health Regen",
-                "+1 Health Regeneration",
+                4, this.loadImage("assets/Max Health.png"), "passive", "Max Hp", "+10 Maximum Health",
                 (game) => {
-                    game.stats.hpRegen += 1/100;
-                }
+                    game.stats.maxHp += 30;
+                    game.stats.hp += 30;
+                },
+                { currentLevel: 0, maxLevel: 5 }
             ),
-
-            //Max HP
+            // Fire Rate
             new ItemObject(
-                4,
-                this.loadImage("assets/Max Health.png"),
-                "passive",
-                "Max Hp",
-                "+10 Maximum Health",
+                6, this.loadImage("assets/singlefireball.png"), "passive", "Fire Rate", "Reduces attack cooldown.",
                 (game) => {
-                    game.stats.maxHp += 10;
-                    game.stats.hp += 10;
-                }
-            ),
-
-
-            // new ItemObject(
-            //     6,
-            //     this.loadImage("assets/Shield.png"),
-            //     "passive",
-            //     "Defense",
-            //     "+1 Defense",
-            //     (game) => {
-            //         game.stats.defense++;
-            //     }
-            // )
-            // ,
-            new ItemObject(
-                6,
-                this.loadImage("assets/singlefireball.png"),
-                "passive",
-                "Fire Rate",
-                "+20% Fire Rate",
-                (game) => {
-                    game.stats.attackCooldown -=40;
+                    game.stats.attackCooldown -= 40;
                     console.log("Attack cooldown is now: " + game.stats.attackCooldown);
-                    if(game.stats.attackCooldown <= 60) {
-                        const index = this.availableUpgrades.findIndex(
-                            (upgrade) => upgrade.name === "Fire Rate"
-                        );
-                        if (index !== -1) {
-                            this.availableUpgrades.splice(index, 1);
-                        }
-                    }
-
-                }
-            )
-            ,
-            new ItemObject(
-                6,
-                this.loadImage("assets/fireball.png"),
-                "passive",
-                "Increased projectiles",
-                "Add another 4 way projectile",
-                (game) => {
-                    game.stats.projectile += 4;
-        
-                    if (game.stats.projectile >= 8) {
-                        // 3. Find this specific upgrade in the pool by its name
-                        const index = this.availableUpgrades.findIndex(
-                            (upgrade) => upgrade.name === "Increased projectiles"
-                        );
-                        
-                        // 4. Remove it completely
-                        if (index !== -1) {
-                            this.availableUpgrades.splice(index, 1);
-                        }
-                    }
-                }
+                },
+                { currentLevel: 0, maxLevel: 3 } // 180 -> 140 -> 100 -> 60
             ),
-
+            // Increased projectiles
             new ItemObject(
-                1,
-                this.loadImage("assets/damageincrease.png"),
-                "passive",
-                "Damage Up",
-                "+20% Damage",
+                6, this.loadImage("assets/fireball.png"), "passive", "Increased Projectiles", "Adds 4 more projectiles.",
+                (game) => { game.stats.projectile += 4; },
+                { currentLevel: 0, maxLevel: 2 } // Starts at 4 -> 8 -> 12
+            ),
+            // Damage Up
+            new ItemObject(
+                1, this.loadImage("assets/damageincrease.png"), "passive", "Damage Up", "Increases damage multiplier.",
                 (game) => {
-                    
                     game.stats.damageMultiplier *= 1.5;
                     console.log("Damage multiplier is now: " + game.stats.damageMultiplier);
-                    if(game.stats.damageMultiplier >= 3) {; 
-                        const index = this.availableUpgrades.findIndex(
-                            (upgrade) => upgrade.name === "Damage Up"
-                        );
-                        if (index !== -1) {
-                            this.availableUpgrades.splice(index, 1);
-                        }
-                    }
-                }
+                },
+                { currentLevel: 0, maxLevel: 3 } 
             )
-
-
-
         ];
-        
+
+        this.selectedUpgrades = []; // Player's inventory
+        this.currentChoices = [];
 
         this.selectedUpgrades = []; // Player's inventory
         this.currentChoices = [];    // Upgrades offered this level up
@@ -301,7 +216,20 @@ export default class LevelUp {
         if (typeof upgrade.effect === 'function') {
             upgrade.effect(this.game);
         }
-
+        // Handle max level logic for stackable upgrades
+        if (!upgrade.stats) upgrade.stats = {};
+        if (upgrade.stats.maxLevel) {
+            // Increment the level
+            upgrade.stats.currentLevel = (upgrade.stats.currentLevel || 0) + 1;
+            
+            // If it reached max level, permanently remove it from the pool!
+            if (upgrade.stats.currentLevel >= upgrade.stats.maxLevel) {
+                const index = this.availableUpgrades.findIndex(u => u.name === upgrade.name);
+                if (index !== -1) {
+                    this.availableUpgrades.splice(index, 1);
+                }
+            }
+        }
         // Add to inventory (weapons persist, consumables also show)
         if(upgrade.type === "weapon" || upgrade.type === "consumable") {
             this.game.inventory.addItem(upgrade);
@@ -548,11 +476,9 @@ export default class LevelUp {
         const r = this.getCardRect(index, canvasWidth);
         const hovered = index === this.hoveredIndex;
 
-        // Card background
         ctx.fillStyle = hovered ? "rgba(255, 255, 255, 0.18)" : "rgba(255, 255, 255, 0.08)";
         ctx.fillRect(r.x, r.y, r.w, r.h);
 
-        // Card border (color by type)
         const borderColor = upgrade.type === "weapon" ? "rgba(255, 100, 100, 0.9)"
                           : upgrade.type === "passive" ? "rgba(100, 200, 255, 0.9)"
                           : "rgba(100, 255, 100, 0.9)";
@@ -560,7 +486,6 @@ export default class LevelUp {
         ctx.lineWidth = hovered ? 3 : 2;
         ctx.strokeRect(r.x, r.y, r.w, r.h);
 
-        // Icon (centered, 64x64)
         const iconSize = 64;
         const iconX = r.x + (r.w - iconSize) / 2;
         const iconY = r.y + 25;
@@ -573,24 +498,39 @@ export default class LevelUp {
             ctx.fillRect(iconX, iconY, iconSize, iconSize);
         }
 
-        // Name
         ctx.fillStyle = "white";
         ctx.font = "bold 20px Arial";
         ctx.textAlign = "center";
         ctx.fillText(upgrade.name, r.x + r.w / 2, iconY + iconSize + 30);
 
-        // Type tag
         ctx.font = "14px Arial";
         ctx.fillStyle = borderColor;
         ctx.fillText(`[${upgrade.type.toUpperCase()}]`, r.x + r.w / 2, iconY + iconSize + 50);
 
-        // Description (word-wrap in card)
+        // --- NEW: Draw Level Progression Text ---
+        if (upgrade.stats && upgrade.stats.maxLevel) {
+            // Display what level they are ABOUT to get if they click this card
+            const nextLevel = (upgrade.stats.currentLevel || 0) + 1;
+            const max = upgrade.stats.maxLevel;
+            
+            ctx.font = "bold 14px Arial";
+            if (nextLevel === max) {
+                ctx.fillStyle = "gold";
+                ctx.fillText(`Level ${nextLevel} (MAX)`, r.x + r.w / 2, iconY + iconSize + 70);
+            } else {
+                ctx.fillStyle = "#00f2fe"; // Cyan
+                ctx.fillText(`Level ${nextLevel} / ${max}`, r.x + r.w / 2, iconY + iconSize + 70);
+            }
+        }
+
+        // Shift description down so it doesn't overlap the new level text
+        const descY = (upgrade.stats && upgrade.stats.maxLevel) ? iconY + iconSize + 95 : iconY + iconSize + 75;
+        
         ctx.fillStyle = "#ccc";
         ctx.font = "14px Arial";
-        this.drawWrappedText(ctx, upgrade.description, r.x + r.w / 2, iconY + iconSize + 72, r.w - 20, 18);
+        this.drawWrappedText(ctx, upgrade.description, r.x + r.w / 2, descY, r.w - 20, 18);
         this.LevelUpFrame=Math.floor(this.game.lastTime/this.game.frameTime);
     }
-
     /**
      * Simple word-wrap text drawing
      */
