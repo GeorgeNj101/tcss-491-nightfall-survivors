@@ -203,7 +203,7 @@ export default class Game {
                 }
             }
             
-            //return; // Skip normal combat/movement updates during the transition
+            //return; 
         }
         // Don't update game logic if paused (level up menu)
         if (!this.gamePaused) {
@@ -231,10 +231,11 @@ export default class Game {
     }
 
     handleWaveSystem(timestamp) {
+        if (this.isWaveTransitioning) return;
         if (this.waveStartTime === 0) this.waveStartTime = timestamp;
         
         // Spawn Wave
-        if (!this.waveEnemiesSpawned && !this.isWaveTransitioning) {
+        if (!this.waveEnemiesSpawned) {
             for (let i = 0; i < this.waveEnemies; i++) {
                 if (Math.random() < 0.4) {
                     this.enemies.push(new ChickenEnemy(this.camera));
@@ -244,13 +245,13 @@ export default class Game {
                     this.enemies.push(new DemonEnemy(this.camera));
                 }
             }
-            if(this.wave > 2 && !this.bossSpawned && !this.isWaveTransitioning){
+            if(this.wave > 2 && !this.bossSpawned){
                 for(let i = 0; i < this.waveBosses; i++){
                     this.bosses.push(new Boss(this.camera));
                     console.log("Spawning Boss for wave " + this.wave);
                 }
             }
-
+            
             this.waveBosses += 1;
             this.bossSpawned = true;
             this.waveEnemiesSpawned = true;
@@ -269,14 +270,6 @@ export default class Game {
             this.bossSpawned = false;
         
            
-        }
-
-        // Spawn a boss after 10 waves have been completed
-        // Spawn a boss after 10 waves have been completed
-        if (this.wave > 2 && !this.bossSpawned) {
-            console.log("Spawning Boss");
-            this.enemies.push(new Boss(this.camera));
-            this.bossSpawned = true;
         }
          
     }

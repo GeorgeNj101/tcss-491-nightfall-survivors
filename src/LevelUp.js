@@ -284,7 +284,10 @@ export default class LevelUp {
         }
 
         // Add to inventory (weapons persist, consumables also show)
-        this.game.inventory.addItem(upgrade);
+        if(upgrade.type === "weapon" || upgrade.type === "consumable") {
+            this.game.inventory.addItem(upgrade);
+        }
+        
 
         // If it's a weapon and we don't have a current weapon, equip it
         if (upgrade.type === "weapon" && !this.game.currentWeapon) {
@@ -317,7 +320,9 @@ export default class LevelUp {
             const pauseDuration = performance.now() - this.game.pauseStartTime;
             this.game.totalPauseTime += pauseDuration;
             this.game.waveStartTime += pauseDuration;
-            this.game.gamePaused = false;
+            //if (!this.game.isWaveTransitioning) {
+                this.game.gamePaused = false;
+            //}
         }
 
         console.log("Level up menu closed. Game resumed.");
