@@ -15,7 +15,8 @@ export default class LevelUp {
         this.pendingLevelUps = 0; // Track multiple level ups at once
 
         this.LevelUpFrame = Math.floor(game.lastTime/this.game.frameTime);
-     
+        
+        // Upgrade options (will be populated in Step 3)
         this.availableUpgrades = [
             // Pistol weapon
             new ItemObject(
@@ -30,6 +31,17 @@ export default class LevelUp {
             // Sprint
             new ItemObject(
                 1, this.loadImage("assets/sprint.png"), "passive", "Sprint", "Increased maximum stamina.",
+                (game) => {
+                    game.stats.speed += 1;
+                }
+            ),
+            // Xp Orb
+            new ItemObject(
+                1,
+                this.loadImage("assets/Xp_Orb.png"),
+                "consumable",
+                "Sprint",
+                "+10 Speed for 10 seconds",
                 (game) => {
                     game.stats.maxStamina += 50; 
                     game.stats.stamina += 50; 
@@ -54,18 +66,15 @@ export default class LevelUp {
             ),
             // Fire Rate
             new ItemObject(
-                6, this.loadImage("assets/singlefireball.png"), "passive", "Fire Rate", "Reduces attack cooldown.",
+                4,
+                this.loadImage("assets/Max Health.png"),
+                "passive",
+                "Max Hp",
+                "+10 Maximum Health",
                 (game) => {
-                    game.stats.attackCooldown -= 40;
-                    console.log("Attack cooldown is now: " + game.stats.attackCooldown);
-                },
-                { currentLevel: 0, maxLevel: 4 } // 180 -> 140 -> 100 -> 60
-            ),
-            // Increased projectiles
-            new ItemObject(
-                6, this.loadImage("assets/fireball.png"), "passive", "Increased Projectiles", "Adds 4 more projectiles.",
-                (game) => { game.stats.projectile += 4; },
-                { currentLevel: 0, maxLevel: 2 } // Starts at 4 -> 8 -> 12
+                    game.stats.maxHp += 10;
+                    game.stats.hp += 10;
+                }
             ),
             // Damage Up
             new ItemObject(
@@ -214,33 +223,20 @@ export default class LevelUp {
      */
     applyUpgrade(upgrade) {
         // Run the upgrade's effect (stat changes, etc.)
-        if (typeof upgrade.effect === 'function') {
-            upgrade.effect(this.game);
-        }
-        // Handle max level logic for stackable upgrades
-        if (!upgrade.stats) upgrade.stats = {};
-        if (upgrade.stats.maxLevel) {
-            // Increment the level
-            upgrade.stats.currentLevel = (upgrade.stats.currentLevel || 0) + 1;
-            
-            // If it reached max level, permanently remove it from the pool!
-            if (upgrade.stats.currentLevel >= upgrade.stats.maxLevel) {
-                const index = this.availableUpgrades.findIndex(u => u.name === upgrade.name);
-                if (index !== -1) {
-                    this.availableUpgrades.splice(index, 1);
-                }
-            }
-        }
+        // if (typeof upgrade.effect === 'function') {
+        //     upgrade.effect(this.game);
+        // }
+
         // Add to inventory (weapons persist, consumables also show)
-        if(upgrade.type === "weapon" || upgrade.type === "consumable") {
-            this.game.inventory.addItem(upgrade);
-        }
+            // if(upgrade.type === "weapon" || upgrade.type === "consumable") {
+            //     this.game.inventory.addItem(upgrade);
+            // }
         
 
         // If it's a weapon and we don't have a current weapon, equip it
-        if (upgrade.type === "weapon" && !this.game.currentWeapon) {
-            this.game.currentWeapon = upgrade;
-        }
+        // if (upgrade.type === "weapon" && !this.game.currentWeapon) {
+        //     this.game.currentWeapon = upgrade;
+        // }
 
         console.log(`Applied upgrade: ${upgrade.name} (${upgrade.type})`);
     }
@@ -481,8 +477,8 @@ export default class LevelUp {
         ctx.fillRect(r.x, r.y, r.w, r.h);
 
         const borderColor = upgrade.type === "weapon" ? "rgba(255, 100, 100, 0.9)"
-                          : upgrade.type === "passive" ? "rgba(100, 200, 255, 0.9)"
-                          : "rgba(100, 255, 100, 0.9)";
+                          : upgrade.type === "consumable" ? "rgba(100, 255, 100, 0.9)"
+                          : "rgba(100, 200, 255, 0.9)"
         ctx.strokeStyle = hovered ? "white" : borderColor;
         ctx.lineWidth = hovered ? 3 : 2;
         ctx.strokeRect(r.x, r.y, r.w, r.h);

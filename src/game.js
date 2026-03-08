@@ -7,6 +7,9 @@ import Camera from "./Camera.js";
 import LevelUp from "./LevelUp.js";
 import Inventory from "./Inventory.js";
 import HeartPickup from "./HeartPickup.js";
+import Slash from "./Slash.js";
+import Forcefield from "./Forcefield.js";
+import ForcefieldPickup from "./ForcefieldPickup.js";
 import Slash from "./weapons/Slash.js";
 import ChickenEnemy from "./enemies/ChickenEnemy.js";
 import DemonEnemy from "./enemies/DemonEnemy.js";
@@ -25,6 +28,7 @@ export default class Game {
         this.bosses = [];
         this.xpOrbs = [];
         this.HeartPickups = [];
+        this.forcefieldPickups = [];
         this.projectiles = [];
         this.gameFrame = 0;
         this.fps = 6;
@@ -110,6 +114,9 @@ export default class Game {
         // --- Weapon ---
         this.currentWeapon = null;
         this.lastShotTime = 0; // timestamp of last weapon shot
+
+        // --- Forcefield ---
+        this.forcefield = null; // Defensive item that absorbs 3 hits
 
         // --- Level Up System ---
         this.levelUpSystem = new LevelUp(this.stats, this);
@@ -508,6 +515,11 @@ export default class Game {
                                 this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
                             }
                     }
+                        // Forcefield pickup drop (7% chance)
+                        if (Math.random() < 0.07) {
+                            this.forcefieldPickups.push(new ForcefieldPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                            console.log("DEBUG: Forcefield dropped! Total forcefields:", this.forcefieldPickups.length);
+                        }
                     break;
                 }
 
@@ -565,24 +577,19 @@ export default class Game {
             }
             enemy.update(this.player.x, this.player.y, this);
             if (this.player.collidesWith(enemy)) {
-                     enemy.markedForDeletion = true; 
-                     this.processDamage(enemy.damage || 10);  
-            }
-        });
-        this.bosses.forEach(enemy => {
-            
-            enemy.update(this.player.x, this.player.y, this);
-            if (this.player.collidesWith(enemy)) {
-                        const dx = this.player.centerX() - enemy.centerX();
-                        const dy = this.player.centerY() - enemy.centerY();
-                        const dist = Math.hypot(dx, dy) || 1;
-                        
-                        // Set an initial velocity instead of teleporting
-                        // (15 is a good number because it will multiply across several frames)
-                        const knockbackForce = 30; 
-                        this.player.kbX = (dx / dist) * knockbackForce;
-                        this.player.kbY = (dy / dist) * knockbackForce;
-                        this.processDamage(enemy.damage|| 20);
+                const isBoss = enemy.maxHp > 100;
+                if (isBoss) {
+                    if (this.stats.hp > 0) this.processDamage(0.05);
+                } else {
+                    if (this.stats.hp > 0) this.processDamage(10);
+                    enemy.markedForDeletion = true;
+                    this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
+                    if (Math.random() < 0.07) {
+                        this.forcefieldPickups.push(new ForcefieldPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                        console.log("DEBUG: Forcefield dropped from player collision! Total forcefields:", this.forcefieldPickups.length);
+                    }
+                    this.score += 10;
+                }
             }
         });
         
@@ -593,6 +600,17 @@ export default class Game {
     }
 
     processDamage(damage) {
+        // Check if forcefield is active and can absorb the damage
+        if (this.forcefield && this.forcefield.isStillActive()) {
+            this.forcefield.takeDamage();
+            // No i-frames when forcefield absorbs damage
+            if (!this.forcefield.isStillActive()) {
+                console.log("DEBUG: Forcefield broken!");
+            }
+            return; // Damage absorbed, no player HP loss
+        }
+
+        // Normal damage processing with invincibility frames
         const now = performance.now();
         if (now - this.lastDamageTime < this.invincibilityDuration) {
             return; // Still invincible
@@ -634,11 +652,41 @@ export default class Game {
             }
         });
 
+        this.forcefieldPickups.forEach(shield => {
+            const dist = shield.getDistance(this.player);
+            if (dist < 150) { // Magnet range
+                const moveX = (this.player.centerX() - shield.centerX()) * 0.1;
+                const moveY = (this.player.centerY() - shield.centerY()) * 0.1;
+                shield.x += moveX;
+                shield.y += moveY;
+            }
+            if (this.player.collidesWith(shield)) {
+                shield.markedForDeletion = true;
+                console.log("DEBUG: Forcefield Collected!");
+                this.forcefield = new Forcefield(this.player);
+            }
+        });
+
         this.xpOrbs = this.xpOrbs.filter(o => !o.markedForDeletion);
         this.HeartPickups = this.HeartPickups.filter(o => !o.markedForDeletion);
     }
 
-   
+    // levelUp() {
+    //     this.stats.level++;
+    //     this.stats.xp = 0;
+    //     this.stats.maxXp = Math.floor(this.stats.maxXp * 1.5);
+    //     this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + 20);
+    //     this.stats.maxHp += 10;
+    //     console.log("DEBUG: Level Up! Level " + this.stats.level);
+    //     if (this.stats.level % 5 === 0) {
+    //         this.stats.speed = Math.min(10, this.stats.speed + 1);
+    //         console.log("DEBUG: Speed Increased! Speed: " + this.stats.speed);
+    //     }
+    //     if (this.stats.level % 3 === 0 ){
+    //         this.stats.attackCooldown = Math.max(30, this.stats.attackCooldown - 20);
+    //         console.log("DEBUG: Attack Speed Increased! Cooldown: " + this.stats.attackCooldown);
+    //     }
+    // }
 
     getNearestEnemy() {
         return this.enemies.reduce((nearest, current) => {
@@ -682,7 +730,7 @@ export default class Game {
 
         const renderList = [this.player,
             this.slash,
-            ...this.enemies, ...this.xpOrbs, ...this.HeartPickups, ...this.projectiles,...this.bosses];
+            ...this.enemies, ...this.xpOrbs, ...this.HeartPickups, ...this.forcefieldPickups, ...this.projectiles];
         this.slash.updateDirection()
         renderList.sort((a, b) => (a.y + a.frameHeight) - (b.y + b.frameHeight));
 
@@ -702,6 +750,13 @@ export default class Game {
                 obj.draw(this.ctx, this.gameFrame, screenX, screenY);
             }
         });
+
+        // Draw forcefield around player if active
+        if (this.forcefield && this.forcefield.isStillActive()) {
+            const screenX = this.player.x - this.camera.x;
+            const screenY = this.player.y - this.camera.y;
+            this.forcefield.draw(this.ctx, screenX, screenY, this.gameFrame);
+        }
 
         this.drawUI(timestamp);
         this.drawDamageOverlay(timestamp);
