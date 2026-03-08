@@ -11,6 +11,7 @@ import Slash from "./weapons/Slash.js";
 import ChickenEnemy from "./enemies/ChickenEnemy.js";
 import DemonEnemy from "./enemies/DemonEnemy.js";
 import FastChickenEnemy from "./enemies/FastChickenEnemy.js";
+import ChickenBoss from "./enemies/ChickenBoss.js";
 
 export default class Game {
     constructor(canvas) {
@@ -249,9 +250,13 @@ export default class Game {
                     this.enemies.push(new DemonEnemy(this.camera));
                 }
             }
-            if(this.wave > 2 && !this.bossSpawned){
+            if(this.wave > 0 && !this.bossSpawned){
                 for(let i = 0; i < this.waveBosses; i++){
                     this.bosses.push(new Boss(this.camera));
+                    console.log("Spawning Boss for wave " + this.wave);
+                }
+                for(let i = 0; i < this.waveBosses; i++){
+                    this.bosses.push(new ChickenBoss(this.camera));
                     console.log("Spawning Boss for wave " + this.wave);
                 }
             }
