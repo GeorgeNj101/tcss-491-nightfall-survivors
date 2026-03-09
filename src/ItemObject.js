@@ -1,6 +1,7 @@
 export default class ItemObject {
-	constructor(frame, image, type, name, description, effect, stats = {}) {
+	constructor(frame, image, projectileSprite, type, name, description, effect, stats = {}) {
 		this.image = image;
+		this.projectileSprite = projectileSprite; // Image for the projectile this weapon fires (or null)
 		this.type = type;          // "weapon", "consumable", "passive", etc.
 		this.name = name;
 		this.description = description;

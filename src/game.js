@@ -7,10 +7,9 @@ import Camera from "./Camera.js";
 import LevelUp from "./LevelUp.js";
 import Inventory from "./Inventory.js";
 import HeartPickup from "./HeartPickup.js";
-import Slash from "./Slash.js";
+import Slash from "./weapons/Slash.js";
 import Forcefield from "./Forcefield.js";
 import ForcefieldPickup from "./ForcefieldPickup.js";
-import Slash from "./weapons/Slash.js";
 import ChickenEnemy from "./enemies/ChickenEnemy.js";
 import DemonEnemy from "./enemies/DemonEnemy.js";
 import FastChickenEnemy from "./enemies/FastChickenEnemy.js";
@@ -41,6 +40,7 @@ export default class Game {
         this.lastDrawTime = 0;
         this.score = 0;
         this.gamePaused = false; // For level up menu
+        this.manualPause = false; // Player-toggled pause (Escape)
         this.pauseStartTime = 0; // Track when pause started
         this.totalPauseTime = 0; // Track total time paused
 
@@ -67,19 +67,21 @@ export default class Game {
             xp: 0,
             maxXp: 5,//changed temperoarily for testing
             level: 1,
-            speed: 4,
+            baseSpeed: 4,        // permanent speed (upgraded by cards)
+            speed: 4,            // effective speed each frame (base or sprint)
+            sprintMultiplier: 1.75, // how much faster sprint is
             attackCooldown: 180,
             attackTimer: 0,
             hpRegen : 0,
             defense : 0,
             projectile : 4,
-            stamina: 100,      
-            maxStamina: 100, 
+            stamina: 100,
+            maxStamina: 100,
             staminaRegen: 0.2,
-            sprintCooldown: false,  
+            sprintCooldown: false,
             isSprinting: false,
             damageMultiplier: 1
-            
+
         };
 
         // --- Wave Logic ---
@@ -128,30 +130,77 @@ export default class Game {
     }
 
     init() {
-        window.addEventListener("keydown", e => {
-            // Force the key to lowercase so 'W' and 'w' are treated the same
-            this.keys[e.key.toLowerCase()] = true; 
-            
-            if ((this.isDead || this.isVictory) && e.key.toLowerCase() === 'r') location.reload();
+        // Keys that should be prevented from scrolling the page
+        const preventKeys = ["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "escape"];
 
-            if (e.key === " " && this.levelUpSystem && (this.levelUpSystem.isLevelingUp || this.levelUpSystem.waveLevelUp)) {
+        window.addEventListener("keydown", e => {
+            const key = e.key.toLowerCase();
+            this.keys[key] = true;
+
+            // Prevent arrow keys and space from scrolling the page
+            if (preventKeys.includes(key)) e.preventDefault();
+
+            if ((this.isDead || this.isVictory) && key === 'r') location.reload();
+
+            if (key === " " && this.levelUpSystem && (this.levelUpSystem.isLevelingUp || this.levelUpSystem.waveLevelUp)) {
                 this.levelUpSystem.closeLevelUpMenu();
-                e.preventDefault(); 
+            }
+
+            // Pause/Resume with Escape (only during gameplay, not in menus)
+            if (key === "escape" && this.screen === 'playing' && !this.isDead && !this.isVictory) {
+                // Don't toggle pause if a level-up or wave menu is open
+                if (this.levelUpSystem && (this.levelUpSystem.isLevelingUp || this.levelUpSystem.waveLevelUp)) return;
+                if (this.isWaveTransitioning) return;
+
+                this.manualPause = !this.manualPause;
+                this.gamePaused = this.manualPause;
+                if (this.manualPause) {
+                    this.pauseStartTime = performance.now();
+                } else {
+                    const pausedFor = performance.now() - this.pauseStartTime;
+                    this.totalPauseTime += pausedFor;
+                    // Push wave timer forward so pause time doesn't count
+                    this.waveStartTime += pausedFor;
+                    // Push the shield timer forward so pause time doesn't count
+                    if (this.forcefield && this.forcefield.isStillActive()) {
+                        this.forcefield.createdAt += pausedFor;
+                    }
+                }
             }
         });
-        
+
         window.addEventListener("keyup", e => {
             this.keys[e.key.toLowerCase()] = false;
         });
 
-        // Mouse tracking — use window-level events so it works while keys are held
+        // Clear all keys when window loses focus (prevents stuck keys from drag/alt-tab)
+        window.addEventListener("blur", () => {
+            this.keys = {};
+        });
+
+        // Mouse tracking — use window-level for mousemove so it works while keys are held
         window.addEventListener("mousemove", e => {
             const rect = this.canvas.getBoundingClientRect();
             this.mouse.x = e.clientX - rect.left;
             this.mouse.y = e.clientY - rect.top;
         });
-        window.addEventListener("mousedown", e => {
-            if (e.button === 0) this.mouse.down = true;
+        // mousedown/mouseup on canvas only (not window) to avoid capturing outside clicks
+        this.canvas.addEventListener("mousedown", e => {
+            e.preventDefault(); // Prevent drag-select which steals focus and causes stuck keys
+
+            // Skip weapon-fire logic when a menu overlay is active
+            // (otherwise preventDefault + mouse.down can swallow or interfere with the click event)
+            if (this.levelUpSystem &&
+                (this.levelUpSystem.isLevelingUp || this.levelUpSystem.waveLevelUp)) {
+                return;
+            }
+
+            if (e.button === 0) {
+                // Don't set mouse.down if clicking on inventory (prevents weapon fire on UI click)
+                const slot = this.inventory.getSlotAt(this.mouse.x, this.mouse.y);
+                if (slot >= 0) return; // Let the click handler deal with it
+                this.mouse.down = true;
+            }
         });
         window.addEventListener("mouseup", e => {
             if (e.button === 0) this.mouse.down = false;
@@ -226,6 +275,12 @@ export default class Game {
             this.handleCombat();
             this.handlePickupCollection();
 
+            // Clean up expired forcefield
+            if (this.forcefield && !this.forcefield.isStillActive()) {
+                console.log("DEBUG: Shield expired!");
+                this.forcefield = null;
+            }
+
             if (this.stats.hp <= 0) {
                 this.isDead = true;
                 this.stats.hp = 0;
@@ -280,36 +335,46 @@ export default class Game {
             this.waveEnemies += 2 * this.wave;
             this.waveBosses = this.wave; // Increase enemies per wave
             this.waveTimer = Math.max(30, this.waveTimer - 5);
-            this.levelUpSystem.triggerWaveLevelUpMenu();
+
+            // Every 3rd wave: full upgrade menu. Other waves: instant small reward.
+            if (this.wave % 3 === 0) {
+                this.levelUpSystem.triggerWaveLevelUpMenu();
+            } else {
+                // Small reward: heal 25% of max HP + bonus XP
+                const healAmount = Math.floor(this.stats.maxHp * 0.25);
+                this.stats.hp = Math.min(this.stats.hp + healAmount, this.stats.maxHp);
+                this.levelUpSystem.addXP(3);
+                this.waveRewardText = `+${healAmount} HP  &  +3 XP`;
+                this.waveRewardTime = timestamp;
+            }
+
             this.isWaveTransitioning = true;
             this.waveTransitionStartTime = timestamp;
             this.waveEnemiesSpawned = false;
             this.bossSpawned = false;
-        
-           
         }
          
     }
 
     handleMovement() {
         let dx = 0, dy = 0;
-        if (this.keys["w"] || this.keys["arrowUp"]) { dy = -1; this.player.direction = 3; }
-        if (this.keys["s"] || this.keys["arrowDown"]) { dy = 1; this.player.direction = 0; }
-        if (this.keys["a"] || this.keys["arrowLeft"]) { dx = -1; this.player.direction = 2; }
-        if (this.keys["d"] || this.keys["arrowRight"]) { dx = 1; this.player.direction = 1; }
+        if (this.keys["w"] || this.keys["arrowup"]) { dy = -1; this.player.direction = 3; }
+        if (this.keys["s"] || this.keys["arrowdown"]) { dy = 1; this.player.direction = 0; }
+        if (this.keys["a"] || this.keys["arrowleft"]) { dx = -1; this.player.direction = 2; }
+        if (this.keys["d"] || this.keys["arrowright"]) { dx = 1; this.player.direction = 1; }
         // --- NEW SPRINT LOGIC ---
         this.stats.isSprinting = false;
         const isMoving = dx !== 0 || dy !== 0;
 
         if (this.keys["shift"] && this.stats.stamina > 0 && isMoving && !this.stats.sprintCooldown) {
 
-            this.stats.speed = 7; // Double speed!
+            this.stats.speed = this.stats.baseSpeed * this.stats.sprintMultiplier;
             this.stats.stamina -= 1; // Drain stamina
             if(this.stats.stamina <= 1) {
                 this.stats.sprintCooldown = true;
             }
             this.stats.isSprinting = true;
-            
+
             // Record position for the ghost trail every few frames
             if (this.gameFrame % 2 === 0) {
                 this.playerTrail.push({
@@ -321,10 +386,10 @@ export default class Game {
                 });
             }
         } else {
-            this.stats.speed = 4; // Normal speed
+            this.stats.speed = this.stats.baseSpeed; // Use baseSpeed (respects upgrades)
             // Regenerate stamina if not sprinting
             if (this.stats.stamina < this.stats.maxStamina) {
-                this.stats.stamina += this.stats.staminaRegen; 
+                this.stats.stamina += this.stats.staminaRegen;
                 if (this.stats.stamina >= 30) {
                     this.stats.sprintCooldown = false; // Reset cooldown once stamina is sufficiently regenerated
                 }
@@ -514,12 +579,11 @@ export default class Game {
                         if (Math.random() < 1/3) {
                                 this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
                             }
-                    }
                         // Forcefield pickup drop (7% chance)
                         if (Math.random() < 0.07) {
                             this.forcefieldPickups.push(new ForcefieldPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
-                            console.log("DEBUG: Forcefield dropped! Total forcefields:", this.forcefieldPickups.length);
                         }
+                    }
                     break;
                 }
 
@@ -613,8 +677,8 @@ export default class Game {
         // Normal damage processing with invincibility frames
         const now = performance.now();
         if (now - this.lastDamageTime < this.invincibilityDuration) {
-            return; // Still invincible
             console.log("DEBUG: Damage Ignored (Invincibility Frames)");
+            return; // Still invincible
         }
         this.lastDamageTime = now;
         this.stats.hp -= Math.max(1, damage - this.stats.defense / 2);
@@ -660,15 +724,23 @@ export default class Game {
                 shield.x += moveX;
                 shield.y += moveY;
             }
-            if (this.player.collidesWith(shield)) {
+            if (!shield.markedForDeletion && this.player.collidesWith(shield)) {
                 shield.markedForDeletion = true;
-                console.log("DEBUG: Forcefield Collected!");
-                this.forcefield = new Forcefield(this.player);
+                if (this.forcefield && this.forcefield.isStillActive()) {
+                    // Stack: add 3 more hits and reset timer
+                    this.forcefield.stackShield();
+                    console.log(`DEBUG: Shield stacked! Hits: ${this.forcefield.hitsRemaining}`);
+                } else {
+                    // First pickup: create new shield
+                    this.forcefield = new Forcefield(this.player);
+                    console.log("DEBUG: Forcefield Collected!");
+                }
             }
         });
 
         this.xpOrbs = this.xpOrbs.filter(o => !o.markedForDeletion);
         this.HeartPickups = this.HeartPickups.filter(o => !o.markedForDeletion);
+        this.forcefieldPickups = this.forcefieldPickups.filter(o => !o.markedForDeletion);
     }
 
     // levelUp() {
@@ -782,7 +854,11 @@ export default class Game {
         }
         if (this.isWaveTransitioningDraw) {
            this.drawWaveTransitionScreen(timestamp);
-            
+        }
+
+        // Draw pause overlay
+        if (this.manualPause) {
+            this.drawPauseScreen();
         }
         }
         this.playerTrail.forEach(trail => {
@@ -841,7 +917,7 @@ export default class Game {
 
         this.drawBar(20, 20, 400, 40, this.stats.hp / this.stats.maxHp, "#740707", "#ef0000", `HP: ${Math.floor(this.stats.hp)} / ${this.stats.maxHp}`);
         // Use LevelUp system for XP bar
-        this.levelUpSystem.drawXPBar(this.ctx, 20, 80,400, 40, this.stats.hp / this.stats.maxHp, "#ff4b1f", "#ff9068", `HP: ${Math.floor(this.stats.hp)} / ${this.stats.maxHp}`);
+        this.levelUpSystem.drawXPBar(this.ctx, 20, 80, 400, 40);
         
         const stamWidth = 500;
         const stamHeight = 50;
@@ -851,8 +927,9 @@ export default class Game {
         const stamY = this.height - stamHeight - marginY;
 
         this.drawStaminaBar(ctx, stamX, stamY, stamWidth, stamHeight, this.stats.stamina, this.stats.maxStamina);
-        // Wave Info
-        const waveElapsed = (timestamp - this.waveStartTime) / 1000;
+        // Wave Info — use pauseStartTime as effective "now" while paused
+        const effectiveTimestamp = this.manualPause ? this.pauseStartTime : timestamp;
+        const waveElapsed = (effectiveTimestamp - this.waveStartTime) / 1000;
         const waveRemaining = Math.max(0, this.waveTimer - waveElapsed);
         const waveMin = Math.floor(waveRemaining / 60);
         const waveSec = Math.floor(waveRemaining % 60);
@@ -871,6 +948,12 @@ export default class Game {
         ctx.fillText(`Wave Timer: ${waveFormatted}`, this.width - 20, 80);
         ctx.fillText(`Enemies: ${this.enemies.length}`, this.width - 20, 120);
         ctx.fillText(`Bosses: ${this.bosses.length}`, this.width - 20, 160);
+
+        // Pause hint (bottom-center)
+        ctx.fillStyle = "rgba(25, 255, 25, 0.4)";
+        ctx.font = "25px arcadeclassic, Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("ESC  to  Pause", this.width / 2, 30);
     }
     drawStaminaBar(ctx, x, y, width, height, current, max) {
         const percent = Math.max(0, current) / max;
@@ -1213,6 +1296,44 @@ export default class Game {
         this.ctx.font = "bold 70px arcadeclassic, Arial";
         this.ctx.fillText(remainingSeconds.toString(), this.width / 2, this.height / 4 + 90);
 
+        // 6. Show small wave reward text (HP + XP) if it was a non-upgrade wave
+        if (this.waveRewardText && this.waveRewardTime) {
+            const rewardAge = timestamp - this.waveRewardTime;
+            if (rewardAge < 3000) {
+                const fadeAlpha = rewardAge < 2000 ? 1 : 1 - (rewardAge - 2000) / 1000;
+                this.ctx.globalAlpha = fadeAlpha;
+                this.ctx.fillStyle = "#66ff66";
+                this.ctx.font = "bold 28px arcadeclassic, Arial";
+                this.ctx.fillText(this.waveRewardText, this.width / 2, this.height / 4 + 150);
+                this.ctx.globalAlpha = 1;
+            }
+        }
+
+        this.ctx.restore();
+    }
+
+    drawPauseScreen() {
+        this.ctx.save();
+
+        // Darken background
+        this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        this.ctx.fillRect(0, 0, this.width, this.height);
+
+        // "PAUSED" text
+        this.ctx.textAlign = "center";
+        this.ctx.textBaseline = "middle";
+        this.ctx.shadowColor = "rgba(0, 200, 255, 0.6)";
+        this.ctx.shadowBlur = 20;
+        this.ctx.fillStyle = "white";
+        this.ctx.font = "bold 80px arcadeclassic, Arial";
+        this.ctx.fillText("PAUSED", this.width / 2, this.height / 2 - 30);
+
+        // Subtitle
+        this.ctx.shadowBlur = 0;
+        this.ctx.fillStyle = "#aaa";
+        this.ctx.font = "28px arcadeclassic, Arial";
+        this.ctx.fillText("Press  ESC  to  Resume", this.width / 2, this.height / 2 + 30);
+
         this.ctx.restore();
     }
 
@@ -1246,17 +1367,31 @@ export default class Game {
         }
     }
     animate(timestamp) {
-       // Handle first frame edge case
-    if (!this.lastTime) this.lastTime = timestamp;
+        // Handle first frame edge case
+        if (!this.lastTime) {
+            this.lastTime = timestamp;
+            this.accumulator = 0;
+        }
 
-    const deltaTime = timestamp - this.lastTime;
-    this.lastTime = timestamp;
+        const elapsed = timestamp - this.lastTime;
+        this.lastTime = timestamp;
 
-    this.update(timestamp); // Pass timestamp, not deltaTime
+        // Fixed timestep: game logic runs at exactly 60 ticks/sec
+        // regardless of monitor refresh rate or mouse activity
+        const TICK_RATE = 1000 / 60; // ~16.67ms per tick
+        this.accumulator += elapsed;
 
-    // --- FIX: Pass timestamp to draw() so the UI timer works ---
-    this.draw(timestamp);
-    requestAnimationFrame(this.animate);
+        // Cap accumulator to prevent spiral of death (e.g. after tab switch)
+        if (this.accumulator > 200) this.accumulator = 200;
+
+        while (this.accumulator >= TICK_RATE) {
+            this.update(timestamp);
+            this.accumulator -= TICK_RATE;
+        }
+
+        // Draw runs every frame for smooth rendering
+        this.draw(timestamp);
+        requestAnimationFrame(this.animate);
     }
 
     // show victory overlay

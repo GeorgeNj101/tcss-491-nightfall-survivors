@@ -20,75 +20,74 @@ export default class LevelUp {
         this.availableUpgrades = [
             // Pistol weapon
             new ItemObject(
-                1, this.loadImage("assets/pistol.png"), "weapon", "Pistol", "Slow but reliable sidearm. Click inventory to equip.",
-                (game) => { }, // Auto-removal handles the splicing now!
+                1, this.loadImage("assets/pistol.png"), this.loadImage("assets/rifleBullet.png"),
+                "weapon", "Pistol", "Slow but reliable sidearm. Click the item on the inventory to equip.",
+                (game) => { },
                 {
                     damage: 15, fireRate: 2, projectileSpeed: 480, range: 800, spread: 0,
-                    projectileSprite: "assets/Shuriken.png", cols: 6, rows: 1, size:30, radius: 15,
-                    currentLevel: 0, maxLevel: 1 
+                    projectileSprite: "assets/rifleBullet.png", cols: 6, rows: 1, size: 30, radius: 15,
+                    currentLevel: 0, maxLevel: 1
                 }
             ),
-            // Sprint
+            // Rifle weapon
             new ItemObject(
-                1, this.loadImage("assets/sprint.png"), "passive", "Sprint", "Increased maximum stamina.",
-                (game) => {
-                    game.stats.speed += 1;
+                1, this.loadImage("assets/rifle.png"), this.loadImage("assets/rifleBullet.png"),
+                "weapon", "Rifle", "Fast but inaccurate. Click the item on the inventory to equip.",
+                (game) => { },
+                {
+                    damage: 10, fireRate: 5, projectileSpeed: 480, range: 800, spread: 0,
+                    projectileSprite: "assets/rifleBullet.png", cols: 6, rows: 1, size: 30, radius: 15,
+                    currentLevel: 0, maxLevel: 1
                 }
             ),
-            // Xp Orb
+            // Sprint (increases base speed)
             new ItemObject(
-                1,
-                this.loadImage("assets/Xp_Orb.png"),
-                "consumable",
-                "Sprint",
-                "+10 Speed for 10 seconds",
+                1, this.loadImage("assets/sprint.png"), null,
+                "mobility", "Sprint", "+1 Base Speed",
                 (game) => {
-                    game.stats.maxStamina += 50; 
-                    game.stats.stamina += 50; 
+                    game.stats.baseSpeed += 1;
+                },
+                { currentLevel: 0, maxLevel: 3 }
+            ),
+            // Stamina Boost
+            new ItemObject(
+                1, this.loadImage("assets/Xp_Orb.png"), null,
+                "mobility", "Stamina Boost", "+50 Max Stamina & +0.2 Regen",
+                (game) => {
+                    game.stats.maxStamina += 50;
+                    game.stats.stamina += 50;
                     game.stats.staminaRegen += 0.2;
                 },
                 { currentLevel: 0, maxLevel: 3 }
             ),
             // HP Regen
             new ItemObject(
-                4, this.loadImage("assets/Regen.png"), "passive", "Health Regen", "+1 Health Regeneration",
+                4, this.loadImage("assets/Regen.png"), null,
+                "consumable", "Health Regen", "+1 Health Regeneration",
                 (game) => { game.stats.hpRegen += 1/100; },
                 { currentLevel: 0, maxLevel: 2 }
             ),
             // Max HP
             new ItemObject(
-                4, this.loadImage("assets/Max Health.png"), "passive", "Max Hp", "+10 Maximum Health",
+                4, this.loadImage("assets/Max Health.png"), null,
+                "consumable", "Max Hp", "+10 Maximum Health",
                 (game) => {
                     game.stats.maxHp += 30;
                     game.stats.hp += 30;
                 },
                 { currentLevel: 0, maxLevel: 5 }
             ),
-            // Fire Rate
-            new ItemObject(
-                4,
-                this.loadImage("assets/Max Health.png"),
-                "passive",
-                "Max Hp",
-                "+10 Maximum Health",
-                (game) => {
-                    game.stats.maxHp += 10;
-                    game.stats.hp += 10;
-                }
-            ),
             // Damage Up
             new ItemObject(
-                1, this.loadImage("assets/damageincrease.png"), "passive", "Damage Up", "Increases damage multiplier.",
+                1, this.loadImage("assets/damageincrease.png"), null,
+                "passive", "Damage Up", "Increases damage multiplier.",
                 (game) => {
                     game.stats.damageMultiplier *= 1.25;
                     console.log("Damage multiplier is now: " + game.stats.damageMultiplier);
                 },
-                { currentLevel: 0, maxLevel: 5} 
+                { currentLevel: 0, maxLevel: 5 }
             )
         ];
-
-        this.selectedUpgrades = []; // Player's inventory
-        this.currentChoices = [];
 
         this.selectedUpgrades = []; // Player's inventory
         this.currentChoices = [];    // Upgrades offered this level up
@@ -149,13 +148,20 @@ export default class LevelUp {
      * Generate random upgrade choices from the pool
      */
     generateChoices() {
+        // Filter out upgrades that have reached their max level
+        const pool = this.availableUpgrades.filter(u => {
+            if (u.stats && u.stats.maxLevel != null) {
+                return (u.stats.currentLevel || 0) < u.stats.maxLevel;
+            }
+            return true; // no maxLevel means always available
+        });
         // Shuffle and pick up to 3 (or all if fewer than 3)
-        const pool = [...this.availableUpgrades];
-        const count = Math.min(3, pool.length);
+        const shuffled = [...pool];
+        const count = Math.min(3, shuffled.length);
         const choices = [];
         for (let i = 0; i < count; i++) {
-            const idx = Math.floor(Math.random() * pool.length);
-            choices.push(pool.splice(idx, 1)[0]);
+            const idx = Math.floor(Math.random() * shuffled.length);
+            choices.push(shuffled.splice(idx, 1)[0]);
         }
         return choices;
     }
@@ -222,21 +228,31 @@ export default class LevelUp {
      * @param {object} upgrade - The upgrade to apply
      */
     applyUpgrade(upgrade) {
+        // Track level progression for maxLevel filtering
+        if (upgrade.stats && upgrade.stats.maxLevel != null) {
+            upgrade.stats.currentLevel = (upgrade.stats.currentLevel || 0) + 1;
+        }
+
         // Run the upgrade's effect (stat changes, etc.)
-        // if (typeof upgrade.effect === 'function') {
-        //     upgrade.effect(this.game);
-        // }
+        if (typeof upgrade.effect === "function") {
+            upgrade.effect(this.game);
+        }
 
         // Add to inventory (weapons persist, consumables also show)
-            // if(upgrade.type === "weapon" || upgrade.type === "consumable") {
-            //     this.game.inventory.addItem(upgrade);
-            // }
-        
+        if (upgrade.type === "weapon" || upgrade.type === "consumable") {
+            // If inventory is full, don't add (prevents silent overflow)
+            if (this.game?.inventory?.inventory?.length >= this.game.inventory.maxSlots) {
+                console.warn("Inventory full - cannot add:", upgrade.name);
+            } else {
+                this.game.inventory.addItem(upgrade);
 
-        // If it's a weapon and we don't have a current weapon, equip it
-        // if (upgrade.type === "weapon" && !this.game.currentWeapon) {
-        //     this.game.currentWeapon = upgrade;
-        // }
+                // If it's a weapon and we don't have a current weapon, equip it
+                if (upgrade.type === "weapon" && !this.game.currentWeapon) {
+                    this.game.currentWeapon = upgrade;
+                    this.game.inventory.equippedIndex = this.game.inventory.inventory.length - 1;
+                }
+            }
+        }
 
         console.log(`Applied upgrade: ${upgrade.name} (${upgrade.type})`);
     }
@@ -264,6 +280,10 @@ export default class LevelUp {
             const pauseDuration = performance.now() - this.game.pauseStartTime;
             this.game.totalPauseTime += pauseDuration;
             this.game.waveStartTime += pauseDuration;
+            // Push shield timer forward so menu time doesn't count
+            if (this.game.forcefield && this.game.forcefield.isStillActive()) {
+                this.game.forcefield.createdAt += pauseDuration;
+            }
             //if (!this.game.isWaveTransitioning) {
                 this.game.gamePaused = false;
             //}
@@ -552,4 +572,3 @@ export default class LevelUp {
         return this.player.maxXp;
     }
 }
-

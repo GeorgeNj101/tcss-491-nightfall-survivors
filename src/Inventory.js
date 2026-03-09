@@ -34,7 +34,6 @@ export default class Inventory {
             item.effect(this.game);
         }
         this.removeItem(item);
-        //this.drawInventory();
     }
 
     /** Called when player clicks an inventory slot */
@@ -54,13 +53,12 @@ export default class Inventory {
         } else if (selectedItem.type === "consumable") {
             this.useItem(selectedItem);
 
-        } else if (selectedItem.type === "speed") {
+        } else if (selectedItem.type === "mobility") {
             if (this.equippedIndex === index) {
-                this.equippedSpeed(index);
-                this.game.currentSpeed = null;
+                this.equippedIndex = -1; // unequip
             } else {
                 this.equippedIndex = index;
-                this.game;
+                this.useItem(selectedItem);
             }
             
         }
