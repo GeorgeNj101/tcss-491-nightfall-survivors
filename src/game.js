@@ -167,6 +167,16 @@ export default class Game {
                     }
                 }
             }
+
+            // Inventory hotkeys (1-5) to equip/use items directly
+            const isInventoryHotkey = !Number.isNaN(parseInt(key, 10)) && key.length === 1;
+            const isLevelUpOpen = this.levelUpSystem && (this.levelUpSystem.isLevelingUp || this.levelUpSystem.waveLevelUp);
+            if (this.screen === 'playing' && !this.isDead && !this.isVictory && !this.gamePaused && !isLevelUpOpen && !this.isWaveTransitioning && isInventoryHotkey) {
+                const slot = parseInt(key, 10) - 1;
+                if (slot >= 0 && slot < this.inventory.maxSlots) {
+                    this.inventory.selectItem(slot);
+                }
+            }
         });
 
         window.addEventListener("keyup", e => {
@@ -947,7 +957,6 @@ export default class Game {
         ctx.fillText(`Wave: ${this.wave}`, this.width - 20, 40);
         ctx.fillText(`Wave Timer: ${waveFormatted}`, this.width - 20, 80);
         ctx.fillText(`Enemies: ${this.enemies.length}`, this.width - 20, 120);
-        ctx.fillText(`Bosses: ${this.bosses.length}`, this.width - 20, 160);
 
         // Pause hint (bottom-center)
         ctx.fillStyle = "rgba(25, 255, 25, 0.4)";
@@ -1213,9 +1222,9 @@ export default class Game {
         const lineH = 30;
         this.ctx.fillText('- Move: W A S D or Arrow Keys', left, y); y += lineH;
         this.ctx.fillText('- Sprint: Hold Shift', left, y); y += lineH;
-        this.ctx.fillText('- Auto-attack: Projectiles fire periodically', left, y); y += lineH;
+        this.ctx.fillText('- Auto-attack: Projectiles fire periodically, all attacks are automatic', left, y); y += lineH;
         this.ctx.fillText('- Objective: Survive as long as possible', left, y); y += lineH;
-        this.ctx.fillText('  Kill enemies to collect XP orbs to level up, get stronger, and eventually beat the boss.', left, y); y += lineH * 2;
+        this.ctx.fillText('  Kill enemies to collect XP orbs to level up and get stronger.', left, y); y += lineH * 2;
 
         // Back button
         const bw = 300, bh = 60;
