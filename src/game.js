@@ -641,22 +641,54 @@ export default class Game {
             }
             enemy.update(this.player.x, this.player.y, this);
             if (this.player.collidesWith(enemy)) {
-                const isBoss = enemy.maxHp > 100;
-                if (isBoss) {
-                    if (this.stats.hp > 0) this.processDamage(0.05);
-                } else {
-                    if (this.stats.hp > 0) this.processDamage(10);
+                    enemy.markedForDeletion = true; 
+                    this.processDamage(enemy.damage || 10); 
                     enemy.markedForDeletion = true;
                     this.xpOrbs.push(new XpOrb(enemy.x, enemy.y));
                     if (Math.random() < 0.07) {
                         this.forcefieldPickups.push(new ForcefieldPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
                         console.log("DEBUG: Forcefield dropped from player collision! Total forcefields:", this.forcefieldPickups.length);
                     }
-                    this.score += 10;
+            }
+           
+            
+        });
+        this.bosses.forEach(boss => {
+            
+            if (this.slash.collidesWith(boss) && !boss.markedForDeletion) {
+                boss.lastMeleeHit = this.gameFrame;
+                boss.hp -= this.slash.damage;
+
+                if (boss.hp <= 0) {
+                    boss.markedForDeletion = true;
+                    // Spawn a massive explosion of XP and a potential heart
+                    for (let k = 0; k < 15; k++) {
+                        this.xpOrbs.push(new XpOrb(boss.x + (Math.random() - 0.5) * 40, boss.y + (Math.random() - 0.5) * 40));
+                    }
+                    if (Math.random() < 0.5) {
+                        this.HeartPickups.push(new HeartPickup(boss.x + (Math.random() - 0.5) * 40, boss.y + (Math.random() - 0.5) * 40));
+                    }
                 }
             }
+
+            // 2. Make the boss actually chase the player!
+            boss.update(this.player.x, this.player.y, this);
+
+            // 3. Player Collision & Smooth Knockback
+            boss.update(this.player.x, this.player.y, this);
+            if (this.player.collidesWith(boss)) {
+                        const dx = this.player.centerX() - boss.centerX();
+                        const dy = this.player.centerY() - boss.centerY();
+                        const dist = Math.hypot(dx, dy) || 1;
+                        
+                        // Set an initial velocity instead of teleporting
+                        // (15 is a good number because it will multiply across several frames)
+                        const knockbackForce = 30; 
+                        this.player.kbX = (dx / dist) * knockbackForce;
+                        this.player.kbY = (dy / dist) * knockbackForce;
+                        this.processDamage(boss.damage|| 20);
+            }
         });
-        
         // 3. Filter out dead objects
         this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
         this.enemies = this.enemies.filter(e => !e.markedForDeletion);

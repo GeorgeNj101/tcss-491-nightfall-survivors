@@ -86,7 +86,15 @@ export default class LevelUp {
                     console.log("Damage multiplier is now: " + game.stats.damageMultiplier);
                 },
                 { currentLevel: 0, maxLevel: 5 }
-            )
+            ), 
+            //increased projectiles.
+            // Increased projectiles
+            new ItemObject(
+                6, this.loadImage("assets/fireball.png"), "passive", 
+                "Increased Projectiles", "Adds 4 more projectiles.",
+                (game) => { game.stats.projectile += 4; },
+                { currentLevel: 0, maxLevel: 2 } // Starts at 4 -> 8 -> 12
+            ),
         ];
 
         this.selectedUpgrades = []; // Player's inventory
