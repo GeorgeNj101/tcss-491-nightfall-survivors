@@ -16,7 +16,7 @@ export default class Boss extends Entity {
             rows: 8,
             radius: 60,
             maxHp: 100,
-            speed: 1.5,
+            speed: 1,
             damage: 30
         });
 

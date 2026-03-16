@@ -90,8 +90,8 @@ export default class LevelUp {
             //increased projectiles.
             // Increased projectiles
             new ItemObject(
-                6, this.loadImage("assets/fireball.png"), "passive", 
-                "Increased Projectiles", "Adds 4 more projectiles.",
+                6, this.loadImage("assets/fireball.png"), null, 
+                "passive", "Increased Projectiles", "Adds 4 more projectiles.",
                 (game) => { game.stats.projectile += 4; },
                 { currentLevel: 0, maxLevel: 2 } // Starts at 4 -> 8 -> 12
             ),

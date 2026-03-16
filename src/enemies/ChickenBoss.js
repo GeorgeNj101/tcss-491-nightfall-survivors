@@ -15,7 +15,7 @@ export default class ChickenBoss extends Entity {
             rows: 8,
             radius: 80,
             maxHp: 50,
-            speed: 2,   
+            speed: 1.3,   
             damage: 30
         });
     }
