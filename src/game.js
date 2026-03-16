@@ -322,7 +322,7 @@ export default class Game {
                     this.enemies.push(new DemonEnemy(this.camera));
                 }
             }
-            if(this.wave > 0 && !this.bossSpawned){
+            if(this.wave > 3 && !this.bossSpawned){
                 for(let i = 0; i < this.waveBosses; i++){
                     this.bosses.push(new Boss(this.camera));
                    
@@ -592,8 +592,8 @@ export default class Game {
                                 this.HeartPickups.push(new HeartPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
                             }
                         // Forcefield pickup drop (7% chance)
-                        if (Math.random() < 0.07) {
-                            this.forcefieldPickups.push(new ForcefieldPickup(enemy.x + (Math.random() - 0.5) * 40, enemy.y + (Math.random() - 0.5) * 40));
+                        if (Math.random() < 0.99) {
+                            this.forcefieldPickups.push(new ForcefieldPickup(enemy.x + (Math.random() - 0.5), enemy.y + (Math.random() - 0.5)));
                         }
                     }
                     break;

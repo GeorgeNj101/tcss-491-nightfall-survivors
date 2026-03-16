@@ -95,6 +95,15 @@ export default class LevelUp {
                 (game) => { game.stats.projectile += 4; },
                 { currentLevel: 0, maxLevel: 2 } // Starts at 4 -> 8 -> 12
             ),
+
+            new ItemObject(
+                6, this.loadImage("assets/singlefireball.png"),null,  "passive", "Fire Rate", "Reduces attack cooldown.",
+                (game) => {
+                    game.stats.attackCooldown -= 40;
+                    console.log("Attack cooldown is now: " + game.stats.attackCooldown);
+                },
+                { currentLevel: 0, maxLevel: 4 } // 180 -> 140 -> 100 -> 60
+            ),
         ];
 
         this.selectedUpgrades = []; // Player's inventory

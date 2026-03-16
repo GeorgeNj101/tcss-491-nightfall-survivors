@@ -6,7 +6,7 @@ export default class Forcefield {
         this.image.src = "assets/forcefield.png";
         this.isActive = true;
         this.createdAt = performance.now();
-        this.duration = 15000; // 15 seconds
+        this.duration = 5000; // 5 seconds
         this.scale = 1; // For animation/visual effect
     }
 
