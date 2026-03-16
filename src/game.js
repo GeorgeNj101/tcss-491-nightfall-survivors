@@ -87,7 +87,7 @@ export default class Game {
         // --- Wave Logic ---
         this.wave = 1;
         this.waveEnemies = 5;
-        this.waveBosses = 0;
+        this.waveBosses = 1;
         this.waveTimer = 60; // seconds
         this.waveStartTime = 0;
         this.waveEnemiesSpawned = false;
@@ -325,12 +325,14 @@ export default class Game {
             if(this.wave > 0 && !this.bossSpawned){
                 for(let i = 0; i < this.waveBosses; i++){
                     this.bosses.push(new Boss(this.camera));
-                    console.log("Spawning Boss for wave " + this.wave);
+                   
                 }
-                for(let i = 0; i < this.waveBosses; i++){
+                console.log("Spawning Boss for wave " + this.wave);
+                for(let i = 0; i < this.waveBosses * 3; i++){
                     this.bosses.push(new ChickenBoss(this.camera));
-                    console.log("Spawning Boss for wave " + this.wave);
+
                 }
+                console.log("Spawning Boss for wave " + this.wave);
             }
             
           
@@ -844,7 +846,7 @@ export default class Game {
 
         const renderList = [this.player,
             this.slash,
-            ...this.enemies, ...this.xpOrbs, ...this.HeartPickups, ...this.forcefieldPickups, ...this.projectiles];
+            ...this.enemies, ...this.bosses, ...this.xpOrbs, ...this.HeartPickups, ...this.forcefieldPickups, ...this.projectiles];
         this.slash.updateDirection()
         renderList.sort((a, b) => (a.y + a.frameHeight) - (b.y + b.frameHeight));
 
@@ -989,7 +991,7 @@ export default class Game {
         ctx.fillText(`Wave: ${this.wave}`, this.width - 20, 40);
         ctx.fillText(`Wave Timer: ${waveFormatted}`, this.width - 20, 80);
         ctx.fillText(`Enemies: ${this.enemies.length}`, this.width - 20, 120);
-
+        ctx.fillText(`Bosses: ${this.bosses.length}`, this.width - 20, 160);
         // Pause hint (bottom-center)
         ctx.fillStyle = "rgba(25, 255, 25, 0.4)";
         ctx.font = "25px arcadeclassic, Arial";

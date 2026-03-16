@@ -3,24 +3,23 @@ import Projectile from "../weapons/Projectile.js";
 
 export default class Boss extends Entity {
     constructor(camera) {
-        super(camera);
+        // Calculate a spawn point just off-screen
+        const spawnX = camera.x + (Math.random() > 0.5 ? -100 : camera.width + 100);
+        const spawnY = camera.y + (Math.random() > 0.5 ? -100 : camera.height + 100);
 
-        // Configure boss sprite sheet parameters BEFORE changing image src
-        // Expected: place a boss sprite sheet at `assets/Boss.png`.
-        // Recommended layout: 4 columns x 4 rows (idle/move/attack frames).
-        this.cols = 4;
-        this.rows = 8;
-        this.radius = 60; // larger collision radius for boss
+        // --- FIXED SUPER CALL ---
+        super(camera, {
+            imagePath: "assets/Demon.png", // Put imagePath inside the config!
+            x: spawnX,
+            y: spawnY,
+            cols: 4,
+            rows: 8,
+            radius: 60,
+            maxHp: 100,
+            speed: 1.5,
+            damage: 30
+        });
 
-        // Replace the image source so Sprite's onload recalculates frames
-        this.image.src = "assets/Demon.png"; // Use same image for now, but can be swapped for a boss sprite sheet
-
-        this.maxHp = 100;
-        this.hp = this.maxHp;
-
-        // Boss is faster than normal enemies
-        this.speed = 2.0;
-        this.damage = 30;
         // Shooting
         this.attackCooldown = 90; // frames
         this.attackTimer = 0;

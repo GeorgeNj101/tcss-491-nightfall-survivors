@@ -2,11 +2,20 @@ import Entity from "./Entity.js";
 
 export default class ChickenBoss extends Entity {
     constructor(camera) {
+        // Calculate a spawn point just off-screen
+        const spawnX = camera.x + (Math.random() > 0.5 ? -100 : camera.width + 100);
+        const spawnY = camera.y + (Math.random() > 0.5 ? -100 : camera.height + 100);
+
+        // --- FIXED SUPER CALL ---
         super(camera, {
-            imagePath: "assets/Chicken_Enemy.png",
+            imagePath: "assets/Chicken_Enemy.png", // Put imagePath inside the config!
+            x: spawnX,
+            y: spawnY,
+            cols: 4, 
+            rows: 8,
             radius: 80,
-            maxHp:  50,
-            speed:4,   // Chickens are fast!
+            maxHp: 50,
+            speed: 2,   
             damage: 30
         });
     }
